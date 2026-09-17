@@ -32,6 +32,7 @@ from arc_agi import OperationMode  # noqa: E402
 
 import arc3.agent as arc3_agent  # noqa: E402
 from arc3.config import Arc3Config  # noqa: E402
+from eval.traces import TraceRecorder  # noqa: E402
 
 SPLIT_PATH = ROOT / "eval" / "split.json"
 EXPERIMENTS_DIR = ROOT / "experiments"
@@ -56,7 +57,7 @@ def git_sha() -> str:
 
 
 def run_one(arc: Any, MyAgent: Any, game_id: str, seed: int, max_actions: int,
-            time_per_game_s: float, overrides: dict) -> dict:
+            time_per_game_s: float, overrides: dict, traces_dir: Path | None = None) -> dict:
     config = {"seed": seed, "max_actions_per_game": max_actions, "global_budget_s": time_per_game_s}
     config.update(overrides)
     os.environ["ARC3_CONFIG_JSON"] = json.dumps(config)
@@ -66,11 +67,16 @@ def run_one(arc: Any, MyAgent: Any, game_id: str, seed: int, max_actions: int,
     env = arc.make(game_id, seed=seed)
     if env is None:
         return {"game_id": game_id, "seed": seed, "error": "could not create env"}
+    recorder = TraceRecorder(env, game_id, seed) if traces_dir is not None else None
+    env = recorder or env
     agent = MyAgent(card_id="bench", game_id=game_id, agent_name=f"bench.{game_id}.{seed}",
                     ROOT_URL="http://localhost", record=False, arc_env=env, tags=["bench"])
     started = time.time()
     agent.main()
     wall = time.time() - started
+    if recorder is not None:
+        traces_dir.mkdir(parents=True, exist_ok=True)
+        recorder.to_trace().save(traces_dir / f"{game_id}_s{seed}.npz")
 
     run = _scorecard_run(arc, game_id)
     diagnostics = agent.brain.diagnostics
@@ -165,7 +171,7 @@ def write_experiment(folder: Path, results: dict, bench_args: dict) -> None:
 
 def run(games: list[str], seeds: list[int], max_actions: int, time_per_game_s: float,
         experiment_id: str, experiments_dir: Path = EXPERIMENTS_DIR,
-        overrides: dict | None = None, quiet: bool = True) -> dict:
+        overrides: dict | None = None, quiet: bool = True, traces: bool = False) -> dict:
     if quiet:
         logging.disable(logging.CRITICAL)
     overrides = overrides or {}
@@ -173,9 +179,11 @@ def run(games: list[str], seeds: list[int], max_actions: int, time_per_game_s: f
     MyAgent = load_my_agent_class()
     runs: list[dict] = []
     started = time.time()
+    traces_dir = Path(experiments_dir) / experiment_id / "traces" if traces else None
     for seed in seeds:
         for game_id in games:
-            result = run_one(arc, MyAgent, game_id, seed, max_actions, time_per_game_s, overrides)
+            result = run_one(arc, MyAgent, game_id, seed, max_actions, time_per_game_s, overrides,
+                             traces_dir=traces_dir)
             runs.append(result)
             print(f"  seed={seed} {game_id:6} levels={result.get('levels_completed', '?'):>2} "
                   f"score={result.get('score', 0):>6} actions={result.get('actions', 0):>5} "
@@ -207,13 +215,14 @@ def main() -> None:
     p.add_argument("--time-per-game", type=float, default=300.0, help="seconds")
     p.add_argument("--id", default=None, help="experiment id (default <date>-<split>-<sha>)")
     p.add_argument("--config", default="{}", help="JSON overrides for Arc3Config")
+    p.add_argument("--traces", action="store_true", help="record per-step frames to <id>/traces/")
     args = p.parse_args()
 
     games = args.games.split(",") if args.games else games_for_split(args.split)
     tag = "custom" if args.games else args.split
     experiment_id = args.id or f"{date.today().isoformat()}-{tag}-{git_sha()}"
     run(games, list(range(args.seeds)), args.max_actions, args.time_per_game, experiment_id,
-        overrides=json.loads(args.config))
+        overrides=json.loads(args.config), traces=args.traces)
 
 
 if __name__ == "__main__":

@@ -20,3 +20,6 @@ reference/
 .DS_Store
 .idea/
 .vscode/
+
+# recorded trajectories (large, regenerable)
+experiments/*/traces/
