@@ -1,0 +1,31 @@
+[project]
+name = "arc3"
+version = "0.0.1"
+description = "ARC-AGI-3 agent for ARC Prize 2026 (offline, exploration + world model)"
+readme = "README.md"
+requires-python = ">=3.12"
+license = "MIT-0"
+dependencies = [
+    "arc-agi==0.9.9",
+    "arcengine==0.9.3",
+    "numpy==2.5.3",
+    "pydantic==2.13.5",
+    "python-dotenv==1.2.3",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest==9.0.2",
+    "kaggle==2.2.4",
+    "pandas==3.0.5",
+    "pyarrow==25.0.1",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+addopts = "-ra"
+markers = [
+    "engine: needs cached game files in environment_files/ (skipped if missing)",
+    "slow: takes more than a few seconds",
+]

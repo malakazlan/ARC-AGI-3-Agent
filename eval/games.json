@@ -1,0 +1,436 @@
+{
+  "generated": "2026-09-17",
+  "games": [
+    {
+      "game_id": "ar25",
+      "versioned_id": "ar25-0c556536",
+      "tags": [
+        "keyboard_click"
+      ],
+      "num_levels": 8,
+      "baseline_actions": [
+        32,
+        50,
+        75,
+        37,
+        89,
+        159,
+        233,
+        73
+      ]
+    },
+    {
+      "game_id": "bp35",
+      "versioned_id": "bp35-0a0ad940",
+      "tags": [
+        "keyboard_click"
+      ],
+      "num_levels": 9,
+      "baseline_actions": [
+        21,
+        48,
+        44,
+        38,
+        33,
+        87,
+        86,
+        131,
+        163
+      ]
+    },
+    {
+      "game_id": "cd82",
+      "versioned_id": "cd82-fb555c5d",
+      "tags": [
+        "keyboard_click"
+      ],
+      "num_levels": 6,
+      "baseline_actions": [
+        55,
+        8,
+        41,
+        21,
+        23,
+        23
+      ]
+    },
+    {
+      "game_id": "cn04",
+      "versioned_id": "cn04-2fe56bfb",
+      "tags": [
+        "keyboard_click"
+      ],
+      "num_levels": 6,
+      "baseline_actions": [
+        29,
+        54,
+        85,
+        300,
+        208,
+        113
+      ]
+    },
+    {
+      "game_id": "dc22",
+      "versioned_id": "dc22-fdcac232",
+      "tags": [
+        "keyboard_click"
+      ],
+      "num_levels": 6,
+      "baseline_actions": [
+        59,
+        102,
+        67,
+        98,
+        324,
+        578
+      ]
+    },
+    {
+      "game_id": "ft09",
+      "versioned_id": "ft09-0d8bbf25",
+      "tags": [],
+      "num_levels": 6,
+      "baseline_actions": [
+        43,
+        12,
+        23,
+        28,
+        65,
+        37
+      ]
+    },
+    {
+      "game_id": "g50t",
+      "versioned_id": "g50t-5849a774",
+      "tags": [
+        "keyboard"
+      ],
+      "num_levels": 7,
+      "baseline_actions": [
+        78,
+        175,
+        179,
+        230,
+        96,
+        54,
+        67
+      ]
+    },
+    {
+      "game_id": "ka59",
+      "versioned_id": "ka59-38d34dbb",
+      "tags": [
+        "keyboard_click"
+      ],
+      "num_levels": 7,
+      "baseline_actions": [
+        28,
+        109,
+        51,
+        51,
+        33,
+        132,
+        326
+      ]
+    },
+    {
+      "game_id": "lf52",
+      "versioned_id": "lf52-271a04aa",
+      "tags": [
+        "click"
+      ],
+      "num_levels": 10,
+      "baseline_actions": [
+        32,
+        81,
+        60,
+        71,
+        205,
+        148,
+        244,
+        109,
+        164,
+        225
+      ]
+    },
+    {
+      "game_id": "lp85",
+      "versioned_id": "lp85-305b61c3",
+      "tags": [
+        "click"
+      ],
+      "num_levels": 8,
+      "baseline_actions": [
+        17,
+        38,
+        31,
+        16,
+        41,
+        60,
+        26,
+        159
+      ]
+    },
+    {
+      "game_id": "ls20",
+      "versioned_id": "ls20-9607627b",
+      "tags": [
+        "keyboard"
+      ],
+      "num_levels": 7,
+      "baseline_actions": [
+        22,
+        123,
+        73,
+        84,
+        96,
+        192,
+        186
+      ]
+    },
+    {
+      "game_id": "m0r0",
+      "versioned_id": "m0r0-492f87ba",
+      "tags": [
+        "keyboard_click"
+      ],
+      "num_levels": 6,
+      "baseline_actions": [
+        30,
+        111,
+        203,
+        26,
+        500,
+        237
+      ]
+    },
+    {
+      "game_id": "r11l",
+      "versioned_id": "r11l-495a7899",
+      "tags": [
+        "click"
+      ],
+      "num_levels": 6,
+      "baseline_actions": [
+        22,
+        33,
+        51,
+        26,
+        52,
+        49
+      ]
+    },
+    {
+      "game_id": "re86",
+      "versioned_id": "re86-8af5384d",
+      "tags": [
+        "keyboard_click"
+      ],
+      "num_levels": 8,
+      "baseline_actions": [
+        26,
+        42,
+        86,
+        108,
+        189,
+        139,
+        424,
+        241
+      ]
+    },
+    {
+      "game_id": "s5i5",
+      "versioned_id": "s5i5-18d95033",
+      "tags": [
+        "click"
+      ],
+      "num_levels": 8,
+      "baseline_actions": [
+        20,
+        89,
+        106,
+        54,
+        162,
+        38,
+        86,
+        83
+      ]
+    },
+    {
+      "game_id": "sb26",
+      "versioned_id": "sb26-7fbdac44",
+      "tags": [
+        "keyboard_click"
+      ],
+      "num_levels": 8,
+      "baseline_actions": [
+        18,
+        28,
+        18,
+        19,
+        31,
+        23,
+        58,
+        18
+      ]
+    },
+    {
+      "game_id": "sc25",
+      "versioned_id": "sc25-635fd71a",
+      "tags": [
+        "keyboard_click"
+      ],
+      "num_levels": 6,
+      "baseline_actions": [
+        36,
+        6,
+        32,
+        83,
+        143,
+        50
+      ]
+    },
+    {
+      "game_id": "sk48",
+      "versioned_id": "sk48-d8078629",
+      "tags": [
+        "keyboard_click"
+      ],
+      "num_levels": 8,
+      "baseline_actions": [
+        61,
+        177,
+        101,
+        103,
+        230,
+        181,
+        125,
+        92
+      ]
+    },
+    {
+      "game_id": "sp80",
+      "versioned_id": "sp80-589a99af",
+      "tags": [
+        "keyboard_click"
+      ],
+      "num_levels": 6,
+      "baseline_actions": [
+        39,
+        58,
+        25,
+        148,
+        96,
+        152
+      ]
+    },
+    {
+      "game_id": "su15",
+      "versioned_id": "su15-1944f8ab",
+      "tags": [
+        "click"
+      ],
+      "num_levels": 9,
+      "baseline_actions": [
+        22,
+        42,
+        26,
+        115,
+        36,
+        31,
+        8,
+        40,
+        41
+      ]
+    },
+    {
+      "game_id": "tn36",
+      "versioned_id": "tn36-ef4dde99",
+      "tags": [
+        "click"
+      ],
+      "num_levels": 7,
+      "baseline_actions": [
+        32,
+        72,
+        26,
+        40,
+        30,
+        55,
+        62
+      ]
+    },
+    {
+      "game_id": "tr87",
+      "versioned_id": "tr87-cd924810",
+      "tags": [
+        "keyboard"
+      ],
+      "num_levels": 6,
+      "baseline_actions": [
+        54,
+        58,
+        40,
+        45,
+        71,
+        146
+      ]
+    },
+    {
+      "game_id": "tu93",
+      "versioned_id": "tu93-0768757b",
+      "tags": [
+        "keyboard_click"
+      ],
+      "num_levels": 9,
+      "baseline_actions": [
+        19,
+        16,
+        34,
+        42,
+        123,
+        80,
+        14,
+        23,
+        111
+      ]
+    },
+    {
+      "game_id": "vc33",
+      "versioned_id": "vc33-5430563c",
+      "tags": [
+        "click"
+      ],
+      "num_levels": 7,
+      "baseline_actions": [
+        7,
+        18,
+        44,
+        61,
+        131,
+        34,
+        152
+      ]
+    },
+    {
+      "game_id": "wa30",
+      "versioned_id": "wa30-ee6fef47",
+      "tags": [
+        "keyboard"
+      ],
+      "num_levels": 9,
+      "baseline_actions": [
+        71,
+        119,
+        183,
+        98,
+        368,
+        68,
+        79,
+        442,
+        415
+      ]
+    }
+  ]
+}

@@ -1,0 +1,34 @@
+{
+  "seed": 20260917,
+  "holdout_fraction": 0.3,
+  "stratify_by": "tags",
+  "dev": [
+    "cn04",
+    "ft09",
+    "g50t",
+    "ka59",
+    "lp85",
+    "ls20",
+    "m0r0",
+    "r11l",
+    "re86",
+    "s5i5",
+    "sb26",
+    "sc25",
+    "sk48",
+    "sp80",
+    "su15",
+    "tu93",
+    "vc33",
+    "wa30"
+  ],
+  "holdout": [
+    "ar25",
+    "bp35",
+    "cd82",
+    "dc22",
+    "lf52",
+    "tn36",
+    "tr87"
+  ]
+}
