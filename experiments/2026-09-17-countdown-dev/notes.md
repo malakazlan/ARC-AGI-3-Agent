@@ -1,28 +1,9 @@
 # 2026-09-17-countdown-dev
 
-- What changed: TODO
-- Result vs baseline: TODO
-- Keep or drop: TODO
+- What changed: countdown-cell mask (same offset every attempt, connected groups) + clock-based budget expiry; no action-independence test yet
+- Result vs baseline (5 median levels, 0.38): sum median levels 7 vs 5 baseline; tu93 0->2, vc33 stable 2. But r11l seed 1 collapsed to 1 state and g50t showed 57-71 inconsistent edges: over-masking (replayed prefixes look like bars).
+- Keep or drop: superseded by the independence rule
 
 ```
-game   levels/seed    med lv med score  actions  states  wall s
-cn04   [0, 0, 0]           0       0.0     1000     449    2.88
-ft09   [0, 0, 1]           0       0.0     1000   121.7    4.15
-g50t   [0, 0, 0]           0       0.0     1000    64.7    5.82
-ka59   [0, 0, 0]           0       0.0     1000   205.3    2.75
-lp85   [1, 1, 0]           1      0.01     1000    20.3    1.75
-ls20   [0, 0, 0]           0       0.0     1000     556    2.52
-m0r0   [0, 0, 0]           0       0.0     1000   181.7    4.03
-r11l   [1, 1, 1]           1      2.12     1000      24    7.76
-re86   [0, 0, 0]           0       0.0     1000     571     1.7
-s5i5   [0, 0, 0]           0       0.0     1000      52    1.81
-sb26   [0, 0, 0]           0       0.0     1000     198    7.38
-sc25   [0, 0, 0]           0       0.0     1000   564.7    4.73
-sk48   [0, 0, 0]           0       0.0     1000   658.7    4.95
-sp80   [1, 1, 1]           1      4.76     1000    41.7    5.25
-su15   [0, 0, 0]           0       0.0     1000   135.3    4.29
-tu93   [2, 2, 1]           2      0.03     1000    26.3    4.43
-vc33   [2, 2, 2]           2      0.03     1000    25.7    3.65
-wa30   [0, 0, 0]           0       0.0     1000     346    1.54
-TOTAL  games=18 seeds=3 sum_median_levels=7 mean_median_score=0.39 actions/level=2700.0 wall=214.2s fallbacks=0
+(see results.json)
 ```

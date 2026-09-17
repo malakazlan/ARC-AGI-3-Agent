@@ -1,28 +1,9 @@
 # 2026-09-18-countdown-indep-dev
 
-- What changed: TODO
-- Result vs baseline: TODO
-- Keep or drop: TODO
+- What changed: countdown cells need action-independent evidence (actions differ at that offset across attempts)
+- Result vs baseline (5 median levels, 0.38): sum median levels 6 (tu93 [1,2,0]); over-masking gone in the toy but offline probe still showed determinism violations at expiry deaths.
+- Keep or drop: keep; superseded by bar reading
 
 ```
-game   levels/seed    med lv med score  actions  states  wall s
-cn04   [0, 1, 0]           0       0.0     1000   327.7     3.0
-ft09   [0, 0, 1]           0       0.0     1000   121.7     4.1
-g50t   [0, 0, 0]           0       0.0     1000    57.3     5.9
-ka59   [0, 0, 0]           0       0.0     1000     122    3.08
-lp85   [1, 1, 0]           1      0.01     1000    20.3    1.88
-ls20   [0, 0, 0]           0       0.0     1000     556    2.41
-m0r0   [0, 0, 0]           0       0.0     1000      85    5.14
-r11l   [1, 1, 1]           1      2.12     1000    18.7    7.34
-re86   [0, 0, 0]           0       0.0     1000     384    1.82
-s5i5   [0, 0, 0]           0       0.0     1000    49.7    1.77
-sb26   [0, 0, 0]           0       0.0     1000     198    7.57
-sc25   [0, 0, 0]           0       0.0     1000   465.3    4.32
-sk48   [0, 0, 0]           0       0.0     1000   658.7    4.99
-sp80   [1, 1, 1]           1      4.76     1000    23.7    5.63
-su15   [0, 0, 0]           0       0.0     1000   135.3    3.82
-tu93   [1, 2, 0]           1       0.0     1000    19.3    4.31
-vc33   [2, 2, 2]           2      0.07     1000    65.3    3.49
-wa30   [0, 0, 0]           0       0.0     1000   129.7    1.67
-TOTAL  games=18 seeds=3 sum_median_levels=6 mean_median_score=0.39 actions/level=2842.1 wall=216.7s fallbacks=0
+(see results.json)
 ```

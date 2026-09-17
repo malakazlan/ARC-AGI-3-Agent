@@ -41,3 +41,17 @@ Dev machine: i5-7300HQ, 4 cores, 7.7 GB RAM in WSL. Benchmarks with many seeds w
 - Diagnosis: on a third of the games nearly every action yields a new state (about 850 states
   per 1000 actions), so the frontier never shrinks. Volatility masking is the next experiment.
 - `scripts/pod_bench.sh` verified from scratch in a clean Linux container.
+
+## 2026-09-18 — Research loop on the explorer (countdown bars)
+
+- Tooling: trace recording in the benchmark, offline analyzer (`eval/traces.py`), contact-sheet
+  renderer (`scripts/render_traces.py`). Looked at the games; read the winners and the report.
+- Killed: timer/animation volatility (0 cells). Found: energy bars on 9 dev games that made every
+  step a new state, plus fixed per-attempt budgets that were being blamed on the last action.
+- Built (tests first): countdown-cell detector with an action-independence rule, bar-read expiry.
+- Numbers, dev, 3 seeds, 1000 choices per game: baseline 5 median levels -> 7 (first mask,
+  over-masked) -> 6 (independence rule) -> 6 (bar-read, identical). RHAE 0.38 -> 0.39.
+  Games with levels: vc33 2 (all seeds), r11l 1, sp80 1, lp85 1, tu93 1 (2 on two seeds).
+- Open: r11l/sp80 die about 33 times per 1000 actions from a commit action; s5i5 and tu93 have
+  under 40 real states and still no win, suggesting our one-click-per-object candidates miss the
+  winning clicks; ls20 has a cyclic bar the detector does not model; g50t and sc25 have hidden state.
