@@ -151,5 +151,6 @@ make status           # Kaggle run status
 - Prioritize by expected score gain vs effort. Deadline: submissions Nov 2, 2026; paper Nov 8.
 - Keep `docs/DECISIONS.md` and `docs/PROGRESS.md` current; they feed the paper.
 - Git: never add Claude as co-author or mention it in commits or anywhere. Short commit messages.
+- Follow `docs/RESEARCH_PROTOCOL.md` for every non-trivial change. General lessons go to `docs/INSIGHTS.md`.
 - Verified environment facts: `docs/ENVIRONMENT.md`. Schedule and phase gates: `docs/ROADMAP.md`
   (authoritative). Step-level detail for Phases 1-4: `docs/KICKOFF.md`.
