@@ -55,3 +55,11 @@ Dev machine: i5-7300HQ, 4 cores, 7.7 GB RAM in WSL. Benchmarks with many seeds w
 - Open: r11l/sp80 die about 33 times per 1000 actions from a commit action; s5i5 and tu93 have
   under 40 real states and still no win, suggesting our one-click-per-object candidates miss the
   winning clicks; ls20 has a cyclic bar the detector does not model; g50t and sc25 have hidden state.
+
+## 2026-09-18 — Action-effect prior
+
+- Dev, 3 seeds, 1000 choices per game: **9 median levels** (baseline 5, countdown 6-7).
+  RHAE 0.37, flat: won levels still cost hundreds of actions. Wall 5.4 min.
+- Confirmed on sb26 and su15 (wasted clicks gone), failed on ft09/lp85 (dead frontier) and
+  sp80 (state-conditional deaths). See `docs/INSIGHTS.md`.
+- Kaggle readiness unchanged: notebook builds; Phase 4's offline notebook dry run not done yet.

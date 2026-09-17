@@ -54,3 +54,11 @@ Implementation details belong in DECISIONS.md, not here. Mark unverified beliefs
 - 2026-09-18 (engine click probe) — s5i5 changes on every click, anywhere, with one outcome:
   its bars move by themselves each action and the only decision is when to click. Timing games
   need the phase in the state, which contradicts bar masking; parked.
+- 2026-09-18 (`2026-09-18-prior-dev`, traced seed) — Class-level action effects transfer
+  across states and levels: "this kind of thing does nothing" cut wasted clicks on sb26 from
+  67% to 1% and on su15 from 16% to 2%, and median dev levels went 6-7 -> 9. Two limits
+  showed up at once. (1) When the frontier is empty of live classes the agent is blind: ft09
+  and lp85 level 2 stay at 80-98% no-ops, so the winning action is not among "one click per
+  object" at all. (2) A commit action that both wins and kills (sp80 ACTION5, 19% kill rate)
+  cannot be judged by class; whether it kills depends on where things are. That is a
+  state-conditional effect, i.e. a small predictive model over object relations, not a prior.
