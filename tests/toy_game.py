@@ -32,10 +32,13 @@ def level_layout(index: int) -> np.ndarray:
 
 class ToyGame:
     def __init__(self, available=(1, 2, 3, 4), levels: int = 2,
-                 extra_cells: dict[tuple[int, int], int] | None = None) -> None:
+                 extra_cells: dict[tuple[int, int], int] | None = None,
+                 budget: int | None = None) -> None:
         self.available = list(available)
         self.levels = levels
         self.extra_cells = dict(extra_cells or {})
+        self.budget = budget          # actions per attempt before GAME_OVER; bar on row 7
+        self.attempt_steps = 0
         self.level = 0
         self.levels_completed = 0
         self.state = "NOT_PLAYED"
@@ -47,7 +50,20 @@ class ToyGame:
         g = level_layout(self.level)
         for (y, x), color in self.extra_cells.items():
             g[y, x] = color
+        if self.budget is not None:
+            g[7, :] = 6                  # full energy bar
+        self.attempt_steps = 0
         return g
+
+    def _tick_budget(self) -> None:
+        if self.budget is None or self.state != "NOT_FINISHED":
+            return
+        self.attempt_steps += 1
+        drained = min(8, (8 * self.attempt_steps) // self.budget)
+        self.grid[7, :drained] = 0
+        if self.attempt_steps >= self.budget:
+            self.state = "GAME_OVER"
+            self.game_overs += 1
 
     def observe(self) -> Observation:
         grid = self.grid.copy() if self.state == "NOT_FINISHED" else None
@@ -65,6 +81,7 @@ class ToyGame:
             self._move(*MOVES[action_id])
         elif action_id == 6 and x is not None and self.grid[y, x] == 5:
             self.grid[y, x] = 0
+        self._tick_budget()
         return self.observe()
 
     def _move(self, dy: int, dx: int) -> None:

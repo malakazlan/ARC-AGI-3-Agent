@@ -87,3 +87,43 @@ def test_explorer_diagnostics_are_exported_through_the_orchestrator():
     brain, _ = run(ToyGame(), steps=50)
     d = brain.diagnostics
     assert d["states"] > 1 and d["edges"] >= d["states"] - 1
+
+
+# --- countdown bars and per-attempt budgets ------------------------------------------
+
+def test_explorer_learns_the_countdown_mask_after_two_attempts():
+    game = ToyGame(levels=1, budget=12)
+    brain, _ = run(game, steps=60)
+    explorer = brain.policy
+    assert game.game_overs >= 2
+    assert explorer.mask is not None and explorer.mask[7].any()
+    assert not explorer.mask[:7].any()
+
+
+def test_budget_deaths_are_not_recorded_as_lethal_edges():
+    game = ToyGame(levels=1, budget=12)
+    brain, _ = run(game, steps=80)
+    explorer = brain.policy
+    assert explorer.diagnostics["budget_deaths"] >= 1
+    assert explorer.budget == 12
+    # after the budget is known, no edge in the graph is marked game_over by an expiry
+    lethal = sum(1 for node in explorer.graph.nodes.values() for e in node.tested.values() if e.game_over)
+    assert lethal == 0
+
+
+def test_masked_state_space_is_small_despite_the_bar():
+    with_bar = ToyGame(levels=1, budget=15)
+    brain, _ = run(with_bar, steps=400)
+    assert brain.policy.diagnostics["states"] < 80    # ~58 reachable cells, not 58 x bar phases
+
+
+def test_explorer_still_clears_a_level_with_a_budget_bar():
+    game = ToyGame(levels=1, budget=40)
+    brain, _ = run(game, steps=1500)
+    assert game.levels_completed == 1
+
+
+def test_countdown_masking_can_be_disabled_by_config():
+    game = ToyGame(levels=1, budget=12)
+    brain, _ = run(game, steps=60, countdown_mask=False)
+    assert brain.policy.mask is None

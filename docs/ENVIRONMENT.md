@@ -143,6 +143,18 @@ Consequences, all measured locally:
   Code Requirements). `[owner, 2026-09-17]`
 - Hidden game count unknown; one team measured about 110. **Design for 100+ games.**
   `[owner, 2026-09-17]`
+- The technical report lists 25 public, 55 semi-private (API-tested) and 55 fully private
+  (competition) environments; the public set is "intentionally easier" and the private set is
+  "intentionally out-of-distribution relative to the public set". `[ARC_AGI_3_Technical_Report
+  Table 1, section 3.6]`
+- Official leaderboard runs terminate a level after 5x the human-median actions for that level.
+  **UNKNOWN** whether the Kaggle gateway applies the same cap; assume it might, so a level that
+  needs more than 5x human actions may never count. `[Technical Report section 4.3]`
+- "The environment's state does not change asynchronously from the agent's actions"; frame
+  sequences are transition animations only. `[Technical Report section 2.3]`
+- Environments are validated so that "a random policy should not successfully solve a level
+  more often than 1 in 10,000 times" (non-tutorial levels); the first level is a tutorial that
+  random agents can occasionally clear. `[Technical Report sections 3.4, 3.5]`
 - Kaggle limits: 1 submission per day, 2 final submissions selectable, team max 8, entry and
   merger deadline 2026-10-26. `[owner, 2026-09-17]`
 - Wheels are installed offline from

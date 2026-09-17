@@ -73,6 +73,101 @@ def volatility_mask(frames: list[np.ndarray]) -> np.ndarray:
     return mask
 
 
+class AttemptSignature:
+    """Per-attempt record of cells that changed exactly once: cell -> (step offset, new value).
+
+    Built incrementally from consecutive frames so no frame buffer is needed. Cells that
+    change more than once are dropped (None) and never revived.
+    """
+
+    def __init__(self) -> None:
+        self.length = 0
+        self.shape: tuple[int, int] | None = None
+        self._prev: np.ndarray | None = None
+        self._cells: dict[tuple[int, int], tuple[int, int] | None] = {}
+
+    def push(self, frame: np.ndarray) -> None:
+        if self._prev is not None and frame.shape == self._prev.shape:
+            offset = self.length
+            for y, x in zip(*np.nonzero(frame != self._prev)):
+                cell = (int(y), int(x))
+                self._cells[cell] = None if cell in self._cells else (offset, int(frame[y, x]))
+        self.shape = (int(frame.shape[0]), int(frame.shape[1]))
+        self._prev = frame
+        self.length += 1
+
+    @property
+    def once(self) -> dict[tuple[int, int], tuple[int, int]]:
+        return {c: s for c, s in self._cells.items() if s is not None}
+
+    def changed(self, cell: tuple[int, int]) -> bool:
+        return cell in self._cells
+
+
+def countdown_mask_from_signatures(signatures: list[AttemptSignature], shape: tuple[int, int],
+                                   min_attempts: int = 2) -> np.ndarray:
+    """Cells that behave like an energy or countdown bar across attempts of the same level.
+
+    A bar cell changes exactly once per attempt, at the same step offset and to the same value,
+    in every attempt that lasted long enough to reach that offset, and in at least two attempts.
+    Isolated cells are ignored (the start cell the player always leaves at step 1 would
+    otherwise qualify): bar cells come in connected groups with staggered offsets.
+    """
+    shape = (int(shape[0]), int(shape[1]))
+    mask = np.zeros(shape, dtype=bool)
+    signatures = [s for s in signatures if s.length >= 2 and s.shape == shape]
+    if len(signatures) < min_attempts:
+        return mask
+    onces = [s.once for s in signatures]
+    consistent: dict[tuple[int, int], tuple[int, int]] = {}
+    seen: set[tuple[int, int]] = set()
+    for once in onces:
+        for cell, (offset, value) in once.items():
+            if cell in seen:
+                continue
+            seen.add(cell)
+            support = 0
+            ok = True
+            for sig, other in zip(signatures, onces):
+                if sig.length <= offset:
+                    if sig.changed(cell):
+                        ok = False
+                        break
+                    continue
+                if other.get(cell) != (offset, value):
+                    ok = False
+                    break
+                support += 1
+            if ok and support >= min_attempts:
+                consistent[cell] = (offset, value)
+    if not consistent:
+        return mask
+    candidates = np.zeros(shape, dtype=np.int8)
+    for (y, x) in consistent:
+        candidates[y, x] = 1
+    for group in segment_objects(candidates, background=0):
+        cells = [c for c in consistent if group.bbox[0] <= c[0] <= group.bbox[2]
+                 and group.bbox[1] <= c[1] <= group.bbox[3]]
+        if group.size >= 2 and len({consistent[c][0] for c in cells}) >= 2:
+            for y, x in cells:
+                mask[y, x] = True
+    return mask
+
+
+def countdown_mask(attempts: list[list[np.ndarray]]) -> np.ndarray:
+    """Batch convenience wrapper over `countdown_mask_from_signatures` for frame lists."""
+    attempts = [a for a in attempts if len(a) >= 2]
+    if not attempts:
+        return np.zeros((0, 0), dtype=bool)
+    signatures = []
+    for frames in attempts:
+        sig = AttemptSignature()
+        for frame in frames:
+            sig.push(frame)
+        signatures.append(sig)
+    return countdown_mask_from_signatures(signatures, attempts[0][0].shape)
+
+
 def state_hash(grid: np.ndarray, mask: np.ndarray | None = None) -> str:
     """Stable key for a grid. Masked cells are replaced by a sentinel so they never matter."""
     keyed = grid.astype(np.int8, copy=True)

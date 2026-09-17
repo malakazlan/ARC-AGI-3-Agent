@@ -23,3 +23,5 @@ reference/
 
 # recorded trajectories (large, regenerable)
 experiments/*/traces/
+
+experiments/*/frames/

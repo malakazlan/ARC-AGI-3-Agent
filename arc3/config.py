@@ -16,6 +16,10 @@ class Arc3Config:
     # Graph explorer: node cap per level (memory) and click candidates per state (branching).
     max_nodes_per_level: int = 5000
     max_click_candidates: int = 64
+    # Learn energy/countdown bars across attempts and drop them from the state key.
+    countdown_mask: bool = True
+    # Deaths at a fixed per-attempt step count are budget expiries, not lethal actions.
+    budget_aware: bool = True
     # Optional local LLM layer. Off by default; must degrade to rules-only when missing.
     reasoner_enabled: bool = False
 

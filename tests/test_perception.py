@@ -146,3 +146,87 @@ def test_segment_objects_anchor_is_a_cell_inside_the_object():
     ay, ax = obj.anchor
     assert g[ay, ax] == 6
     assert obj.centroid != obj.anchor
+
+
+# --- countdown_mask -------------------------------------------------------------
+
+def attempt_with_bar(player_path: list[tuple[int, int]]) -> list[np.ndarray]:
+    """Frames of one attempt: bottom row drains one cell per step; a player cell moves."""
+    frames = []
+    for t, (py, px) in enumerate(player_path):
+        g = grid8()
+        g[7, :] = 3
+        g[7, :t] = 0             # countdown: cell x switches off at step x
+        g[py, px] = 1
+        frames.append(g)
+    return frames
+
+
+def test_countdown_mask_finds_cells_that_change_at_the_same_offsets_every_attempt():
+    from arc3.perception import countdown_mask
+
+    a1 = attempt_with_bar([(1, 1), (1, 2), (1, 3), (2, 3), (3, 3), (3, 4)])
+    a2 = attempt_with_bar([(1, 1), (2, 1), (3, 1), (3, 2), (3, 3), (4, 3)])
+    mask = countdown_mask([a1, a2])
+    assert mask[7, :5].all()            # bar cells that drained in both attempts
+    assert not mask[:7].any()           # the player never counts
+
+
+def test_countdown_mask_tolerates_attempts_of_different_length():
+    from arc3.perception import countdown_mask
+
+    a1 = attempt_with_bar([(1, 1), (1, 2), (1, 3), (2, 3), (3, 3), (3, 4), (3, 5)])
+    a2 = attempt_with_bar([(1, 1), (2, 1), (3, 1)])
+    mask = countdown_mask([a1, a2])
+    assert mask[7, :2].all()
+    assert not mask[:7].any()
+
+
+def test_countdown_mask_needs_two_attempts():
+    from arc3.perception import countdown_mask
+
+    a1 = attempt_with_bar([(1, 1), (1, 2), (1, 3)])
+    assert not countdown_mask([a1]).any()
+    assert not countdown_mask([]).any()
+
+
+def test_countdown_mask_ignores_cells_that_change_at_different_offsets():
+    from arc3.perception import countdown_mask
+
+    def attempt(offsets):
+        frames = []
+        for t in range(6):
+            g = grid8()
+            if t in offsets:
+                g[0, 0] = 5
+            frames.append(g)
+        return frames
+
+    assert not countdown_mask([attempt({1, 2}), attempt({3, 4})]).any()
+
+
+def test_countdown_mask_uses_long_attempts_even_when_one_attempt_is_short():
+    """A short attempt must not hide bar cells that only drain later in long attempts."""
+    from arc3.perception import countdown_mask
+
+    long_a = attempt_with_bar([(1, 1), (1, 2), (1, 3), (2, 3), (3, 3), (3, 4), (3, 5)])
+    long_b = attempt_with_bar([(1, 1), (2, 1), (3, 1), (3, 2), (3, 3), (4, 3), (4, 4)])
+    short = attempt_with_bar([(1, 1), (2, 1)])
+    mask = countdown_mask([long_a, short, long_b])
+    assert mask[7, :6].all()
+    assert not mask[:7].any()
+
+
+def test_incremental_attempt_signature_matches_batch():
+    from arc3.perception import AttemptSignature, countdown_mask, countdown_mask_from_signatures
+
+    a1 = attempt_with_bar([(1, 1), (1, 2), (1, 3), (2, 3), (3, 3), (3, 4)])
+    a2 = attempt_with_bar([(1, 1), (2, 1), (3, 1), (3, 2), (3, 3), (4, 3)])
+    sigs = []
+    for frames in (a1, a2):
+        sig = AttemptSignature()
+        for frame in frames:
+            sig.push(frame)
+        sigs.append(sig)
+    assert np.array_equal(countdown_mask_from_signatures(sigs, (8, 8)), countdown_mask([a1, a2]))
+    assert sigs[0].length == 6

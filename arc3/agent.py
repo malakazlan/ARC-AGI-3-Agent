@@ -111,6 +111,8 @@ class Orchestrator:
                 rng=self.rng,
                 max_nodes=config.max_nodes_per_level,
                 max_clicks=config.max_click_candidates,
+                use_countdown_mask=config.countdown_mask,
+                budget_aware=config.budget_aware,
             )
         return self._random_policy
 
