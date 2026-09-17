@@ -19,8 +19,11 @@ FRAMEWORK_DIR   := vendor/ARC-AGI-3-Agents
 COMP_SLUG       := arc-prize-2026-arc-agi-3
 GAME            ?=
 STEPS           ?= 200
+SPLIT           ?= dev
+SEEDS           ?= 3
+BENCH_ARGS      ?=
 
-.PHONY: help setup play-local pull-sample notebook submit status verify-local test clean _check-kaggle
+.PHONY: help setup play-local pull-sample notebook submit status verify-local test bench clean _check-kaggle
 
 _check-kaggle:
 	@if [ ! -s .kaggle/access_token ]; then \
@@ -58,6 +61,9 @@ verify-local: ## Quick smoke test: 50 steps on ls20 + vc33 only
 
 test: ## Run unit tests (fast, no network)
 	$(VENV_PY) -m pytest -q
+
+bench: ## Benchmark on a split: make bench SPLIT=dev|holdout SEEDS=3 [BENCH_ARGS="--max-actions 500"]
+	$(VENV_PY) eval/benchmark.py --split $(SPLIT) --seeds $(SEEDS) $(BENCH_ARGS)
 
 list-games: ## Show all available games
 	$(VENV_PY) scripts/play_local.py --list

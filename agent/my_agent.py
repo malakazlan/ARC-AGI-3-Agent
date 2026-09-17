@@ -41,6 +41,15 @@ def _import_arc3():
 Orchestrator, observation_from_frame, process_started_at, Arc3Config = _import_arc3()
 
 
+def _config_from_env() -> Any:
+    """Benchmarks inject knobs through ARC3_CONFIG_JSON; Kaggle runs use the defaults."""
+    try:
+        overrides = json.loads(os.environ.get("ARC3_CONFIG_JSON", "") or "{}")
+        return Arc3Config(**overrides)
+    except Exception:  # noqa: BLE001
+        return Arc3Config()
+
+
 class MyAgent(Agent):
     """arc3 orchestrator behind the framework's Agent interface."""
 
@@ -49,7 +58,7 @@ class MyAgent(Agent):
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
-        self.brain = Orchestrator(Arc3Config(), game_id=self.game_id, started_at=process_started_at())
+        self.brain = Orchestrator(_config_from_env(), game_id=self.game_id, started_at=process_started_at())
 
     def is_done(self, frames: list[FrameData], latest_frame: FrameData) -> bool:
         try:

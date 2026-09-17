@@ -1,13 +1,5 @@
-"""Planning over the transition graph: shortest paths, replay of known wins.
+"""Planning over the transition graph: shortest paths to the exploration frontier."""
 
-Interface only (Phase 2). Phase 3 implements BFS shortest path to the frontier.
-"""
-from __future__ import annotations
+from arc3.plan.bfs import path_to_nearest_frontier
 
-from typing import Protocol
-
-from arc3.world_model import Transition
-
-
-class Planner(Protocol):
-    def shortest_path(self, src_key: str, dst_key: str) -> list[Transition] | None: ...
+__all__ = ["path_to_nearest_frontier"]

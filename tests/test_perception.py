@@ -136,3 +136,13 @@ def test_state_hash_ignores_masked_cells():
 
 def test_state_hash_depends_on_shape():
     assert state_hash(np.zeros((8, 8), dtype=np.int8)) != state_hash(np.zeros((4, 16), dtype=np.int8))
+
+
+def test_segment_objects_anchor_is_a_cell_inside_the_object():
+    g = grid8()
+    g[0, 0:5] = 6            # L shape whose centroid is outside the object
+    g[1:5, 0] = 6
+    (obj,) = segment_objects(g, background=0)
+    ay, ax = obj.anchor
+    assert g[ay, ax] == 6
+    assert obj.centroid != obj.anchor

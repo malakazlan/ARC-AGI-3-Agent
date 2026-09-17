@@ -28,3 +28,16 @@ Dev machine: i5-7300HQ, 4 cores, 7.7 GB RAM in WSL. Benchmarks with many seeds w
   (200 actions per game, 50 s wall).
 - Notebook bundles `arc3/` (17 cells). `scripts/pod_bench.sh` bootstraps Colab or a pod.
 - Next: Phase 3, Baseline 1 graph explorer plus `eval/benchmark.py` and `make bench`.
+
+## 2026-09-17 — Phase 3 done: Baseline 1 measured
+
+- Graph explorer implemented test-first (73 tests, 13 s). `eval/benchmark.py` + `make bench`
+  write `experiments/<id>/{results.json,config.yaml,notes.md}`.
+- **Baseline 1, dev split, 18 games x 3 seeds, 1000 choices per game, 5 min wall:**
+  sum of median levels **5** (lp85 1, r11l 1, sp80 1, vc33 2; ft09 and m0r0 won a level on one
+  seed each). Mean median local RHAE **0.38 / 100**. 0 fallbacks, 0 inconsistent edges.
+- Random-legal control under the same budget: sum of median levels **2**, mean median RHAE **0.27**
+  (`experiments/2026-09-17-random-dev`). Explorer beats random on levels; scores are noise.
+- Diagnosis: on a third of the games nearly every action yields a new state (about 850 states
+  per 1000 actions), so the frontier never shrinks. Volatility masking is the next experiment.
+- `scripts/pod_bench.sh` verified from scratch in a clean Linux container.

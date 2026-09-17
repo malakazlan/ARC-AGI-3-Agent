@@ -96,3 +96,9 @@ def test_diagnostics_line_is_json_with_game_id():
     line = agent.diagnostics_line()
     record = json.loads(line)
     assert record["game_id"] == "g9" and record["actions"] == 1
+
+
+def test_config_can_be_injected_through_the_environment(monkeypatch):
+    monkeypatch.setenv("ARC3_CONFIG_JSON", '{"seed": 5, "max_actions_per_game": 7}')
+    agent = make_agent("g1")
+    assert agent.brain.config.seed == 5 and agent.brain.config.max_actions_per_game == 7

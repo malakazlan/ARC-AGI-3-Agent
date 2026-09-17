@@ -1,0 +1,89 @@
+"""Graph explorer policy driven through the orchestrator on the toy game."""
+from __future__ import annotations
+
+from arc3.agent import Orchestrator
+from arc3.config import Arc3Config
+from arc3.explore import GraphExplorer
+from tests.toy_game import ToyGame
+
+
+def run(game: ToyGame, seed: int = 0, steps: int = 400, **cfg) -> tuple[Orchestrator, list]:
+    brain = Orchestrator(Arc3Config(seed=seed, policy="graph", **cfg), game_id="toy", started_at=0.0)
+    obs = game.observe()
+    log = []
+    for _ in range(steps):
+        if brain.is_done(obs, now=1.0):
+            break
+        choice = brain.choose(obs, now=1.0)
+        log.append((obs.state, choice))
+        obs = game.apply(choice.action_id, choice.x, choice.y)
+    return brain, log
+
+
+def test_orchestrator_builds_graph_explorer_from_config():
+    brain = Orchestrator(Arc3Config(policy="graph"), game_id="toy", started_at=0.0)
+    assert isinstance(brain.policy, GraphExplorer)
+
+
+def test_explorer_never_repeats_a_tested_pair_while_a_frontier_exists():
+    brain, _ = run(ToyGame(), steps=300)
+    explorer = brain.policy
+    assert explorer.graph.inconsistent == 0
+    assert explorer.diagnostics["repeats"] == 0
+
+
+def test_explorer_marks_game_over_edges_and_never_retries_them():
+    game = ToyGame(levels=1, extra_cells={(1, 2): 3})   # trap right next to the start
+    brain, log = run(game, steps=80)
+    explorer = brain.policy
+    # the trap has up to four approaches; each (state, action) pair may end the game once
+    assert 1 <= game.game_overs <= 4
+    assert explorer.diagnostics["game_overs"] == game.game_overs
+    assert explorer.diagnostics["game_over_retries"] == 0
+    resets = sum(1 for _, c in log if c.action_id == 0)
+    assert resets == game.game_overs + 1   # one per game over, plus the initial reset
+
+
+def test_explorer_clears_both_toy_levels_within_budget():
+    game = ToyGame()
+    brain, _ = run(game, steps=1500)
+    assert game.levels_completed == 2
+    assert brain.diagnostics["levels_completed"] == 2
+
+
+def test_same_seed_gives_the_same_trajectory():
+    _, log_a = run(ToyGame(), seed=3, steps=200)
+    _, log_b = run(ToyGame(), seed=3, steps=200)
+    assert log_a == log_b
+
+
+def test_graph_is_reset_on_every_level_change():
+    game = ToyGame()
+    brain, _ = run(game, steps=1500)
+    explorer = brain.policy
+    assert game.levels_completed == 2
+    assert explorer.level_index == 2
+    assert explorer.diagnostics["levels_seen"] == 2   # two levels were actually played
+    assert explorer.graph.size() == 0                  # nothing left over after the final win
+
+
+def test_click_candidates_are_object_anchors_and_buttons_get_found():
+    game = ToyGame(available=[6], extra_cells={(2, 2): 5, (5, 5): 5})
+    brain, log = run(game, steps=25)
+    clicks = [(c.y, c.x) for _, c in log if c.action_id == 6]
+    assert (2, 2) in clicks and (5, 5) in clicks
+    assert brain.policy.diagnostics["repeats"] == 0
+
+
+def test_explorer_falls_back_to_random_legal_when_frontier_is_exhausted():
+    game = ToyGame(available=[3])          # only "left": walks into the wall forever
+    brain, log = run(game, steps=30)
+    assert all(c.action_id == 3 for _, c in log[1:])   # log[0] is the initial reset
+    assert brain.policy.diagnostics["exhausted"] > 0
+    assert brain.diagnostics["fallbacks"] == 0
+
+
+def test_explorer_diagnostics_are_exported_through_the_orchestrator():
+    brain, _ = run(ToyGame(), steps=50)
+    d = brain.diagnostics
+    assert d["states"] > 1 and d["edges"] >= d["states"] - 1

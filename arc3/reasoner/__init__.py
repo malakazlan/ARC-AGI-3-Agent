@@ -6,7 +6,7 @@ from __future__ import annotations
 
 from typing import Protocol
 
-from arc3.agent import ActionChoice, Observation
+from arc3.types import ActionChoice, Observation
 
 
 class Reasoner(Protocol):

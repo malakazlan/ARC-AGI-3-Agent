@@ -22,6 +22,7 @@ class GridObject:
     size: int
     bbox: BBox
     centroid: tuple[float, float]  # (y, x)
+    anchor: tuple[int, int]  # (y, x) cell inside the object nearest its centroid
 
 
 def frame_diff(a: np.ndarray, b: np.ndarray) -> FrameDiff:
@@ -109,11 +110,14 @@ def _flood_fill(
 def _object_from_cells(color: int, cells: list[tuple[int, int]]) -> GridObject:
     ys = [y for y, _ in cells]
     xs = [x for _, x in cells]
+    cy, cx = sum(ys) / len(cells), sum(xs) / len(cells)
+    anchor = min(cells, key=lambda c: ((c[0] - cy) ** 2 + (c[1] - cx) ** 2, c))
     return GridObject(
         color=color,
         size=len(cells),
         bbox=(min(ys), min(xs), max(ys), max(xs)),
-        centroid=(sum(ys) / len(cells), sum(xs) / len(cells)),
+        centroid=(cy, cx),
+        anchor=anchor,
     )
 
 
