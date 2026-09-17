@@ -83,16 +83,18 @@ class AttemptSignature:
     def __init__(self) -> None:
         self.length = 0
         self.shape: tuple[int, int] | None = None
+        self.actions: list[object] = []  # actions[o] produced frame o; actions[0] is None
         self._prev: np.ndarray | None = None
         self._cells: dict[tuple[int, int], tuple[int, int] | None] = {}
 
-    def push(self, frame: np.ndarray) -> None:
+    def push(self, frame: np.ndarray, action: object = None) -> None:
         if self._prev is not None and frame.shape == self._prev.shape:
             offset = self.length
             for y, x in zip(*np.nonzero(frame != self._prev)):
                 cell = (int(y), int(x))
                 self._cells[cell] = None if cell in self._cells else (offset, int(frame[y, x]))
         self.shape = (int(frame.shape[0]), int(frame.shape[1]))
+        self.actions.append(None if self._prev is None else action)
         self._prev = frame
         self.length += 1
 
@@ -110,8 +112,11 @@ def countdown_mask_from_signatures(signatures: list[AttemptSignature], shape: tu
 
     A bar cell changes exactly once per attempt, at the same step offset and to the same value,
     in every attempt that lasted long enough to reach that offset, and in at least two attempts.
-    Isolated cells are ignored (the start cell the player always leaves at step 1 would
-    otherwise qualify): bar cells come in connected groups with staggered offsets.
+    The change must be independent of what the agent did: among the supporting attempts, the
+    actions taken at that offset must differ (an identical replay would make the player's own
+    trail look like a bar; unknown actions, None, are treated as differing). Isolated cells are
+    ignored (the start cell the player always leaves at step 1 would otherwise qualify): bar
+    cells come in connected groups with staggered offsets.
     """
     shape = (int(shape[0]), int(shape[1]))
     mask = np.zeros(shape, dtype=bool)
@@ -128,6 +133,8 @@ def countdown_mask_from_signatures(signatures: list[AttemptSignature], shape: tu
             seen.add(cell)
             support = 0
             ok = True
+            actions_seen: set[object] = set()
+            unknown = False
             for sig, other in zip(signatures, onces):
                 if sig.length <= offset:
                     if sig.changed(cell):
@@ -138,7 +145,12 @@ def countdown_mask_from_signatures(signatures: list[AttemptSignature], shape: tu
                     ok = False
                     break
                 support += 1
-            if ok and support >= min_attempts:
+                action = sig.actions[offset] if offset < len(sig.actions) else None
+                if action is None:
+                    unknown = True
+                actions_seen.add(action)
+            independent = unknown or len(actions_seen) >= 2
+            if ok and support >= min_attempts and independent:
                 consistent[cell] = (offset, value)
     if not consistent:
         return mask
@@ -154,18 +166,24 @@ def countdown_mask_from_signatures(signatures: list[AttemptSignature], shape: tu
     return mask
 
 
-def countdown_mask(attempts: list[list[np.ndarray]]) -> np.ndarray:
-    """Batch convenience wrapper over `countdown_mask_from_signatures` for frame lists."""
-    attempts = [a for a in attempts if len(a) >= 2]
-    if not attempts:
+def countdown_mask(attempts: list[list[np.ndarray]],
+                   actions: list[list[object]] | None = None) -> np.ndarray:
+    """Batch convenience wrapper over `countdown_mask_from_signatures` for frame lists.
+
+    `actions[i][o-1]` is the action that produced frame `o` of attempt `i`. Without actions the
+    independence test is skipped (only sensible for synthetic data).
+    """
+    keep = [k for k, a in enumerate(attempts) if len(a) >= 2]
+    if not keep:
         return np.zeros((0, 0), dtype=bool)
     signatures = []
-    for frames in attempts:
+    for k in keep:
         sig = AttemptSignature()
-        for frame in frames:
-            sig.push(frame)
+        acts = actions[k] if actions is not None else None
+        for o, frame in enumerate(attempts[k]):
+            sig.push(frame, None if (acts is None or o == 0) else acts[o - 1])
         signatures.append(sig)
-    return countdown_mask_from_signatures(signatures, attempts[0][0].shape)
+    return countdown_mask_from_signatures(signatures, attempts[keep[0]][0].shape)
 
 
 def state_hash(grid: np.ndarray, mask: np.ndarray | None = None) -> str:

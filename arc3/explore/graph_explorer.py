@@ -74,7 +74,7 @@ class GraphExplorer:
             self.attempt_actions = 0
         elif self.pending is not None:
             self.attempt_actions += 1
-        self.attempt.push(observation.grid)
+        self.attempt.push(observation.grid, self.pending[1] if self.pending else None)
 
         key = state_hash(observation.grid, self.mask)
         if self.pending is not None:

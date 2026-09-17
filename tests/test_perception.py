@@ -230,3 +230,27 @@ def test_incremental_attempt_signature_matches_batch():
         sigs.append(sig)
     assert np.array_equal(countdown_mask_from_signatures(sigs, (8, 8)), countdown_mask([a1, a2]))
     assert sigs[0].length == 6
+
+
+def test_countdown_mask_ignores_cells_replayed_with_identical_actions():
+    """Same actions every attempt make the player trail look like a bar. No evidence, no mask."""
+    from arc3.perception import countdown_mask
+
+    path = [(1, 1), (1, 2), (1, 3), (2, 3), (3, 3), (3, 4)]
+    a1 = attempt_with_bar(path)
+    a2 = attempt_with_bar(path)
+    actions = [[4, 4, 2, 2, 4]] * 2
+    assert not countdown_mask([a1, a2], actions).any()
+
+
+def test_countdown_mask_requires_differing_actions_at_each_offset():
+    """Bar cells are masked only from the first offset where attempts took different actions."""
+    from arc3.perception import countdown_mask
+
+    a1 = attempt_with_bar([(1, 1), (1, 2), (1, 3), (2, 3), (3, 3), (3, 4)])
+    a2 = attempt_with_bar([(1, 1), (1, 2), (2, 2), (3, 2), (3, 3), (4, 3)])
+    actions = [[4, 4, 2, 2, 4], [4, 2, 3, 4, 2]]   # first action identical, then different
+    mask = countdown_mask([a1, a2], actions)
+    assert not mask[7, 0]              # offset 1: both attempts pressed 4, no evidence
+    assert mask[7, 1:5].all()          # offsets 2..5: actions differed, bar still drained
+    assert not mask[:7].any()          # the two trails differ, nothing else masked
