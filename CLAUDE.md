@@ -27,7 +27,11 @@ Goals in priority order: (1) generalize to unseen games, (2) complete more level
 - License: our code MIT-0 or CC0. Any third-party code/models must be Apache-2.0 / MIT / GPLv3 or similar
   shareable license. Record every dependency's license in `THIRD_PARTY.md`.
 - Deterministic and reproducible: seeds everywhere, pinned versions, no hidden state.
-- 1 leaderboard submission per day. Never submit from Claude Code; only prepare. Human clicks submit.
+- 1 leaderboard submission per day, 2 final submissions selectable, team max 8, entry/merger deadline
+  Oct 26, 2026. Never submit from Claude Code; only prepare. Human clicks submit.
+- Hidden roster size unknown (one team measured ~110). Design for 100+ games inside the 6h budget.
+- Count RESET as an action in all budgets (gateway behavior unconfirmed).
+- Dev runtime is Linux (WSL2 Ubuntu or a Docker `python:3.12` container). No mingw workarounds.
 
 ## 3. Repo layout
 

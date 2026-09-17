@@ -119,6 +119,8 @@ Consequences, all measured locally:
   growing through repeated GAME_OVER + RESET). `[measured: scorecard output]`
 - **UNKNOWN**: whether the online gateway counts RESET, invalid, or game-over actions the same
   way. Docs say "internal operations ... are not counted"; they do not mention RESET.
+  Decision: keep the strict assumption (every RESET and every sent action may count).
+  `[owner, 2026-09-17]`
 - In competition mode "scoring is against all available environments, even if you choose not
   to interact with them", `make()` may be called once per environment, and only one scorecard.
   `[docs:toolkit/competition_mode]`
@@ -135,9 +137,14 @@ Consequences, all measured locally:
   `[src:agents/agent.py main]`
 - The official sample (`Stochastic Goose`) stops itself at `8 h - 5 min` wall time and sets
   `MAX_ACTIONS = inf`. That implies an 8 h notebook limit but is not an official statement.
-  **UNKNOWN**: the official Kaggle runtime limit, hidden game count, and whether the limit is
-  per notebook or per game. Kaggle pages need login and were not readable from here.
   `[src:reference/stochastic-goose]`
+- Runtime limit is not in public docs; community reports kills around 6 to 9 h. **Working
+  assumption: 6 h global budget with margin** until confirmed on the Kaggle page (log in, Overview,
+  Code Requirements). `[owner, 2026-09-17]`
+- Hidden game count unknown; one team measured about 110. **Design for 100+ games.**
+  `[owner, 2026-09-17]`
+- Kaggle limits: 1 submission per day, 2 final submissions selectable, team max 8, entry and
+  merger deadline 2026-10-26. `[owner, 2026-09-17]`
 - Wheels are installed offline from
   `/kaggle/input/competitions/arc-prize-2026-arc-agi-3/arc_agi_3_wheels` (`arc-agi`,
   `python-dotenv`). Any extra dependency must be in that wheel dir or attached as a dataset.
