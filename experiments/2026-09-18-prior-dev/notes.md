@@ -1,8 +1,17 @@
 # 2026-09-18-prior-dev
 
-- What changed: TODO
-- Result vs baseline: TODO
-- Keep or drop: TODO
+- What changed: online action-effect prior (action_prior flag). Per class (key id, or click
+  target colour + size bucket): tries, changes, deaths. Untested actions are picked by class
+  score; classes dead after 3 tries or lethal after 2 deaths at >= 50% are explored last.
+- Hypothesis: no-op click rate on ft09/lp85/sb26 falls under 30% and sp80 deaths under 10
+  per 1000 actions.
+- Result vs previous best (6-7 median levels, 0.39): 9 median levels, 0.37. New: m0r0 1 and
+  lp85 1 on all seeds, s5i5 1 on two seeds, tu93 2 median, r11l level 1 faster (score 4.76).
+  Kill metrics: sb26 no-ops 67% -> 1%, su15 16% -> 2% (confirmed); ft09 86% -> 80% and
+  lp85 98% -> 98% (not moved: the winning action is outside the candidate set); sp80 deaths
+  37 -> 31 (not moved: ACTION5 both wins and kills, class kill rate 19%, so it is correctly
+  not deferred; lethality is state-conditional there).
+- Keep or drop: keep. Wall 5.4 min, 0 fallbacks.
 
 ```
 game   levels/seed    med lv med score  actions  states  wall s
