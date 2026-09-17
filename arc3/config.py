@@ -20,6 +20,9 @@ class Arc3Config:
     countdown_mask: bool = True
     # Deaths at a fixed per-attempt step count are budget expiries, not lethal actions.
     budget_aware: bool = True
+    # Learn per action class (key id, or click target colour+size) what does nothing or kills;
+    # explore those classes last.
+    action_prior: bool = True
     # Optional local LLM layer. Off by default; must degrade to rules-only when missing.
     reasoner_enabled: bool = False
 

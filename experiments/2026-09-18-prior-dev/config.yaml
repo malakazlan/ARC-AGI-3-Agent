@@ -1,0 +1,16 @@
+# effective config (defaults + benchmark overrides)
+seed: 0
+global_budget_s: 19800.0
+max_actions_per_game: 2000
+policy: "graph"
+max_nodes_per_level: 5000
+max_click_candidates: 64
+countdown_mask: true
+budget_aware: true
+action_prior: true
+reasoner_enabled: false
+bench_games: ["cn04", "ft09", "g50t", "ka59", "lp85", "ls20", "m0r0", "r11l", "re86", "s5i5", "sb26", "sc25", "sk48", "sp80", "su15", "tu93", "vc33", "wa30"]
+bench_seeds: [0, 1, 2]
+bench_max_actions: 1000
+bench_time_per_game_s: 300.0
+bench_overrides: {}

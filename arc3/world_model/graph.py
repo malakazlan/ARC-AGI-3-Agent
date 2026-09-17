@@ -18,6 +18,7 @@ class Edge:
 class Node:
     key: str
     candidates: list[ActionKey]
+    classes: dict[ActionKey, tuple] = field(default_factory=dict)  # action -> effect class
     tested: dict[ActionKey, Edge] = field(default_factory=dict)
 
     def untested(self) -> list[ActionKey]:
@@ -33,13 +34,14 @@ class StateGraph:
         self.inconsistent = 0  # same (state, action) seen with a different result
         self.edges = 0
 
-    def add_node(self, key: str, candidates: list[ActionKey]) -> bool:
+    def add_node(self, key: str, candidates: list[ActionKey],
+                 classes: dict[ActionKey, tuple] | None = None) -> bool:
         """Register a state. Returns False when the cap refuses a new state."""
         if key in self.nodes:
             return True
         if len(self.nodes) >= self.max_nodes:
             return False
-        self.nodes[key] = Node(key, list(candidates))
+        self.nodes[key] = Node(key, list(candidates), dict(classes or {}))
         return True
 
     def __contains__(self, key: str) -> bool:
@@ -64,6 +66,12 @@ class StateGraph:
     def untested(self, key: str) -> list[ActionKey]:
         node = self.nodes.get(key)
         return [] if node is None else node.untested()
+
+    def action_class(self, key: str, action: ActionKey) -> tuple:
+        node = self.nodes.get(key)
+        if node is None:
+            return (action[0],)
+        return node.classes.get(action, (action[0],))
 
     def size(self) -> int:
         return len(self.nodes)

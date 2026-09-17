@@ -161,3 +161,38 @@ def test_death_with_energy_left_is_still_a_lethal_edge():
     assert explorer.diagnostics["game_over_retries"] == 0
     trap_deaths = explorer.diagnostics["game_overs"] - explorer.diagnostics["budget_deaths"]
     assert trap_deaths >= 1
+
+
+# --- action-effect prior --------------------------------------------------------------
+
+def test_dead_click_classes_are_explored_last():
+    """Walls never react to clicks; after a few tries the explorer stops clicking them."""
+    game = ToyGame(levels=1, available=[6], extra_cells={(2, 2): 5, (5, 5): 5, (6, 6): 5})
+    brain, log = run(game, steps=40)
+    wall_clicks = [c for _, c in log if c.action_id == 6 and game.grid[c.y, c.x] == 2]
+    assert len(wall_clicks) <= 4
+    prior = brain.policy.prior
+    assert prior.score((6, 5, "1-4")) > prior.score((6, 2, "5-16"))   # buttons learned as useful
+    button_steps = [i for i, (_, c) in enumerate(log) if c.action_id == 6 and (c.y, c.x) in {(2, 2), (5, 5), (6, 6)}]
+    assert sorted(button_steps)[2] <= 6                                # all three found almost at once
+
+
+def test_lethal_commit_is_deferred_after_two_deaths():
+    game = ToyGame(levels=1, available=[1, 2, 3, 4, 5], extra_cells={(6, 6): 7})
+    brain, log = run(game, steps=400)
+    commits = sum(1 for _, c in log if c.action_id == 5)
+    assert game.game_overs <= 4
+    assert commits <= game.game_overs + 2
+    assert brain.policy.prior.deferred((5,)) or game.levels_completed == 1
+
+
+def test_deferred_actions_still_get_tested_when_nothing_else_is_left():
+    game = ToyGame(levels=1, available=[1, 2, 3, 4, 5], extra_cells={(6, 6): 7})
+    brain, _ = run(game, steps=2500)
+    assert game.levels_completed == 1
+
+
+def test_action_prior_can_be_disabled():
+    game = ToyGame(levels=1, available=[1, 2, 3, 4, 5], extra_cells={(6, 6): 7})
+    brain, _ = run(game, steps=100, action_prior=False)
+    assert brain.policy.prior is None

@@ -113,6 +113,7 @@ class Orchestrator:
                 max_clicks=config.max_click_candidates,
                 use_countdown_mask=config.countdown_mask,
                 budget_aware=config.budget_aware,
+                use_action_prior=config.action_prior,
             )
         return self._random_policy
 

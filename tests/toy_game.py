@@ -2,7 +2,8 @@
 
 8x8 grid. Colors: 0 floor, 1 player, 2 wall, 3 trap (GAME_OVER), 4 goal (level up), 5 button.
 ACTION1..4 move the player up/down/left/right; walls block (no-op). ACTION6 on a button
-removes it; anywhere else it is a no-op. Two levels; level 2 has a different layout.
+removes it; anywhere else it is a no-op. ACTION5 is a commit: level up when the player stands
+on a cell of color 7, otherwise GAME_OVER. Two levels; level 2 has a different layout.
 `extra_cells` paints extra cells onto every layout (also after resets).
 """
 from __future__ import annotations
@@ -81,14 +82,26 @@ class ToyGame:
             self._move(*MOVES[action_id])
         elif action_id == 6 and x is not None and self.grid[y, x] == 5:
             self.grid[y, x] = 0
+        elif action_id == 5:
+            self._commit()
         self._tick_budget()
         return self.observe()
+
+    def _commit(self) -> None:
+        py, px = map(int, np.argwhere(self.grid == 1)[0])
+        if self.extra_cells.get((py, px)) == 7:
+            self._advance()
+        else:
+            self.state = "GAME_OVER"
+            self.game_overs += 1
 
     def _move(self, dy: int, dx: int) -> None:
         py, px = map(int, np.argwhere(self.grid == 1)[0])
         ny, nx = py + dy, px + dx
         if not (0 <= ny < 8 and 0 <= nx < 8) or self.grid[ny, nx] == 2:
             return
+        if self.budget is not None and ny == 7:
+            return                       # the energy bar row is not walkable
         target = self.grid[ny, nx]
         self.grid[py, px] = 0
         if target == 3:
@@ -96,11 +109,14 @@ class ToyGame:
             self.game_overs += 1
             return
         if target == 4:
-            self.levels_completed += 1
-            self.level += 1
-            if self.level >= self.levels:
-                self.state = "WIN"
-            else:
-                self.grid = self._layout()
+            self._advance()
             return
         self.grid[ny, nx] = 1
+
+    def _advance(self) -> None:
+        self.levels_completed += 1
+        self.level += 1
+        if self.level >= self.levels:
+            self.state = "WIN"
+        else:
+            self.grid = self._layout()

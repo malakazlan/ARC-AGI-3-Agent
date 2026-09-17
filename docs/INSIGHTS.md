@@ -44,3 +44,13 @@ Implementation details belong in DECISIONS.md, not here. Mark unverified beliefs
   re86. General lesson: a HUD element is a resource readout; use its value, not the clock.
   Residual violations on g50t, sc25, sp80 exist even on raw frames, so those games have hidden
   state or randomness and need a different idea.
+- 2026-09-18 (engine click probe from level starts; death probe on traces) — One click per
+  object is the wrong action space in two ways. Where it matters: r11l is an aiming game (24
+  background cells, 24 outcomes) and su15 has a keypad that segmentation fuses into one object
+  (9 cells, 9 outcomes). Where it wastes: on ft09, lp85 and sb26, 40 to 88% of clicks hit
+  object classes that never change anything. Deaths are also class-shaped: on sp80, 34 of 37
+  deaths come from ACTION5 from 37 different states. Humans learn "that kind of thing does
+  nothing / kills" after two or three tries and stop; the explorer re-learns it per state.
+- 2026-09-18 (engine click probe) — s5i5 changes on every click, anywhere, with one outcome:
+  its bars move by themselves each action and the only decision is when to click. Timing games
+  need the phase in the state, which contradicts bar masking; parked.

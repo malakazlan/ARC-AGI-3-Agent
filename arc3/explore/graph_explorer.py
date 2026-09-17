@@ -21,7 +21,7 @@ import numpy as np
 from arc3.perception import AttemptSignature, countdown_mask_from_signatures, segment_objects, state_hash
 from arc3.plan import path_to_nearest_frontier
 from arc3.types import COMPLEX_ACTION_ID, ActionChoice, ActionKey, Observation
-from arc3.world_model import StateGraph
+from arc3.world_model import ActionPrior, StateGraph, click_class
 
 KEPT_ATTEMPTS = 10  # attempt signatures remembered per level (sparse, tiny)
 DRAINED_FRACTION = 0.9  # bar cells at their drained value => the death was an expiry
@@ -29,12 +29,14 @@ DRAINED_FRACTION = 0.9  # bar cells at their drained value => the death was an e
 
 class GraphExplorer:
     def __init__(self, rng: random.Random, max_nodes: int = 5000, max_clicks: int = 64,
-                 use_countdown_mask: bool = True, budget_aware: bool = True) -> None:
+                 use_countdown_mask: bool = True, budget_aware: bool = True,
+                 use_action_prior: bool = True) -> None:
         self.rng = rng
         self.max_nodes = max_nodes
         self.max_clicks = max_clicks
         self.use_countdown_mask = use_countdown_mask
         self.budget_aware = budget_aware
+        self.prior: ActionPrior | None = ActionPrior() if use_action_prior else None
         self.graph = StateGraph(max_nodes)
         self.level_index = 0
         self.current_key: str | None = None
@@ -55,7 +57,7 @@ class GraphExplorer:
             "states": 0, "edges": 0, "inconsistent": 0, "repeats": 0, "game_overs": 0,
             "game_over_retries": 0, "exhausted": 0, "capped": 0, "plans": 0, "plan_steps": 0,
             "levels_seen": 0, "win_path_lengths": [], "budget_deaths": 0, "mask_cells": 0,
-            "budget": None, "graph_rebuilds": 0,
+            "budget": None, "graph_rebuilds": 0, "deferred_picks": 0,
         }
 
     # -- learning from what happened -------------------------------------------------------
@@ -83,12 +85,15 @@ class GraphExplorer:
         key = state_hash(observation.grid, self.mask)
         if self.pending is not None:
             src, action = self.pending
-            self.graph.record(src, action, key, changed=key != src, game_over=False, level_up=False)
+            changed = key != src
+            self.graph.record(src, action, key, changed=changed, game_over=False, level_up=False)
+            self._record_effect(src, action, changed=changed, game_over=False)
             self.pending = None
         if key not in self.graph:
             if self.diagnostics["levels_seen"] == 0 or self.graph.size() == 0:
                 self.diagnostics["levels_seen"] += 1
-            if not self.graph.add_node(key, self._candidates(observation)):
+            candidates, classes = self._candidates(observation)
+            if not self.graph.add_node(key, candidates, classes):
                 self.diagnostics["capped"] += 1
         self.current_key = key
         self._sync_counters()
@@ -106,6 +111,7 @@ class GraphExplorer:
                 self.diagnostics["budget_deaths"] += 1
             else:
                 self.graph.record(src, action, None, changed=False, game_over=True, level_up=False)
+                self._record_effect(src, action, changed=False, game_over=True)
         self.death_lengths[died_at] += 1
         self._close_attempt()
         self._learn_budget()
@@ -119,6 +125,10 @@ class GraphExplorer:
         hits = sum(1 for (y, x), v in self.drain_values.items()
                    if y < grid.shape[0] and x < grid.shape[1] and grid[y, x] == v)
         return hits / len(self.drain_values) >= DRAINED_FRACTION
+
+    def _record_effect(self, src: str, action: ActionKey, changed: bool, game_over: bool) -> None:
+        if self.prior is not None:
+            self.prior.record(self.graph.action_class(src, action), changed, game_over)
 
     def _close_attempt(self) -> None:
         if self.attempt.length >= 2:
@@ -184,27 +194,53 @@ class GraphExplorer:
     def _pick(self, key: str | None, observation: Observation) -> tuple[ActionKey, str]:
         if key is None or key not in self.graph:
             return self._random_legal(observation), "graph: state not stored"
-        untested = self.graph.untested(key)
-        if untested:
+        live = self._live_untested(key)
+        if live:
             self.plan = []
-            simple = [a for a in untested if a[0] != COMPLEX_ACTION_ID]
-            tier = simple or untested
-            return self.rng.choice(tier), f"graph: untested ({len(untested)} left here)"
+            return self._best(key, live), f"graph: untested ({len(live)} live here)"
         if self.plan and self.plan[0][0] == key:
             _, action = self.plan.pop(0)
             self.diagnostics["plan_steps"] += 1
             return action, f"graph: plan step ({len(self.plan)} left)"
-        self.plan = self._plan_from(key)
+        self.plan = self._plan_from(key, self._has_live_untested)
         if self.plan:
             self.diagnostics["plans"] += 1
             _, action = self.plan.pop(0)
             self.diagnostics["plan_steps"] += 1
             return action, f"graph: new plan ({len(self.plan)} more)"
+        deferred = self.graph.untested(key)
+        if deferred:
+            self.diagnostics["deferred_picks"] += 1
+            return self.rng.choice(deferred), f"graph: deferred class ({len(deferred)} left here)"
+        self.plan = self._plan_from(key, lambda k: bool(self.graph.untested(k)))
+        if self.plan:
+            self.diagnostics["plans"] += 1
+            _, action = self.plan.pop(0)
+            self.diagnostics["plan_steps"] += 1
+            return action, f"graph: plan to deferred ({len(self.plan)} more)"
         self.diagnostics["exhausted"] += 1
         return self._random_legal(observation), "graph: frontier exhausted, random legal"
 
-    def _plan_from(self, key: str) -> list[tuple[str, ActionKey]]:
-        path = path_to_nearest_frontier(self.graph, key)
+    def _live_untested(self, key: str) -> list[ActionKey]:
+        untested = self.graph.untested(key)
+        if self.prior is None:
+            return untested
+        return [a for a in untested if not self.prior.deferred(self.graph.action_class(key, a))]
+
+    def _has_live_untested(self, key: str) -> bool:
+        return bool(self._live_untested(key))
+
+    def _best(self, key: str, actions: list[ActionKey]) -> ActionKey:
+        """Simple actions before clicks; within the tier, the most promising class (ties random)."""
+        simple = [a for a in actions if a[0] != COMPLEX_ACTION_ID]
+        tier = simple or actions
+        if self.prior is None:
+            return self.rng.choice(tier)
+        scored = [(self.prior.score(self.graph.action_class(key, a)), self.rng.random(), a) for a in tier]
+        return max(scored)[2]
+
+    def _plan_from(self, key: str, is_frontier) -> list[tuple[str, ActionKey]]:
+        path = path_to_nearest_frontier(self.graph, key, is_frontier)
         if not path:
             return []
         steps: list[tuple[str, ActionKey]] = []
@@ -216,19 +252,24 @@ class GraphExplorer:
 
     # -- candidates ------------------------------------------------------------------------
 
-    def _candidates(self, observation: Observation) -> list[ActionKey]:
+    def _candidates(self, observation: Observation) -> tuple[list[ActionKey], dict[ActionKey, tuple]]:
         legal = observation.available_actions
         keys: list[ActionKey] = [(a, None, None) for a in legal if a != COMPLEX_ACTION_ID]
+        classes: dict[ActionKey, tuple] = {k: (k[0],) for k in keys}
         if COMPLEX_ACTION_ID in legal and observation.grid is not None:
             objects = segment_objects(observation.grid)
             objects.sort(key=lambda o: (o.size, o.bbox))  # small things first: buttons
             for obj in objects[: self.max_clicks]:
                 y, x = obj.anchor
-                keys.append((COMPLEX_ACTION_ID, int(x), int(y)))
+                key = (COMPLEX_ACTION_ID, int(x), int(y))
+                keys.append(key)
+                classes[key] = click_class(obj.color, obj.size)
             if not objects:
                 h, w = observation.grid.shape
-                keys.append((COMPLEX_ACTION_ID, w // 2, h // 2))
-        return keys
+                key = (COMPLEX_ACTION_ID, w // 2, h // 2)
+                keys.append(key)
+                classes[key] = click_class(int(observation.grid[h // 2, w // 2]), h * w)
+        return keys, classes
 
     def _random_legal(self, observation: Observation) -> ActionKey:
         legal = observation.available_actions or [1]
