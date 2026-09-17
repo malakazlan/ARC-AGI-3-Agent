@@ -35,3 +35,12 @@ Implementation details belong in DECISIONS.md, not here. Mark unverified beliefs
   (51, 76, 101, 130, 201 steps), i.e. a per-attempt action budget, not a lethal action. Two
   general mechanics follow: budgets are visible as a monotone border indicator, and death at
   the budget boundary says nothing about the last action.
+- 2026-09-18 (offline determinism probes on `2026-09-17-traces-dev`) — Masking the bar alone
+  breaks determinism: the same masked state and action once leads onward and once to
+  GAME_OVER, because the bar was empty. Counting steps does not fix it (g50t deaths alternate
+  at 83 and 129 steps: energy cost differs per action). Reading the indicator does: in every
+  budget game the bar is fully drained in the frame before death (fraction 1.00), and once
+  such deaths are treated as expiry the violations vanish on cn04, ka59, m0r0, s5i5, tu93 and
+  re86. General lesson: a HUD element is a resource readout; use its value, not the clock.
+  Residual violations on g50t, sc25, sp80 exist even on raw frames, so those games have hidden
+  state or randomness and need a different idea.

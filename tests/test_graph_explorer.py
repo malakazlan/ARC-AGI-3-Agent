@@ -127,3 +127,37 @@ def test_countdown_masking_can_be_disabled_by_config():
     game = ToyGame(levels=1, budget=12)
     brain, _ = run(game, steps=60, countdown_mask=False)
     assert brain.policy.mask is None
+
+
+def test_expiry_is_read_from_the_bar_not_the_clock():
+    """Once the bar is known, a death with the bar empty is expiry; with the bar full it is not."""
+    import numpy as np
+
+    game = ToyGame(levels=1, budget=12)
+    brain, _ = run(game, steps=60)
+    explorer = brain.policy
+    assert explorer.mask is not None and explorer.drain_values
+    empty = game.grid.copy()
+    empty[7, :] = 0
+    full = game.grid.copy()
+    full[7, :] = 6
+    explorer.last_grid = empty
+    assert explorer._bar_drained()
+    explorer.last_grid = full
+    assert not explorer._bar_drained()
+    explorer.budget = None            # the clock rule is off; the bar alone decides
+    explorer.last_grid = empty
+    before = explorer.diagnostics["budget_deaths"]
+    explorer.pending = (next(iter(explorer.graph.nodes)), (3, None, None))
+    explorer._on_game_over()
+    assert explorer.diagnostics["budget_deaths"] == before + 1
+
+
+def test_death_with_energy_left_is_still_a_lethal_edge():
+    game = ToyGame(levels=1, budget=40, extra_cells={(1, 2): 3})   # trap next to the start
+    brain, _ = run(game, steps=120)
+    explorer = brain.policy
+    assert explorer.diagnostics["game_overs"] >= 1
+    assert explorer.diagnostics["game_over_retries"] == 0
+    trap_deaths = explorer.diagnostics["game_overs"] - explorer.diagnostics["budget_deaths"]
+    assert trap_deaths >= 1

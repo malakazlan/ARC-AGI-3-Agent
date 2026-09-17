@@ -24,6 +24,7 @@ from arc3.types import COMPLEX_ACTION_ID, ActionChoice, ActionKey, Observation
 from arc3.world_model import StateGraph
 
 KEPT_ATTEMPTS = 10  # attempt signatures remembered per level (sparse, tiny)
+DRAINED_FRACTION = 0.9  # bar cells at their drained value => the death was an expiry
 
 
 class GraphExplorer:
@@ -43,6 +44,8 @@ class GraphExplorer:
         self._last_levels: int | None = None
         # per-level attempt memory
         self.mask: np.ndarray | None = None
+        self.drain_values: dict[tuple[int, int], int] = {}  # bar cell -> value it drains to
+        self.last_grid: np.ndarray | None = None
         self.budget: int | None = None
         self.attempts: list[AttemptSignature] = []
         self.attempt = AttemptSignature()
@@ -75,6 +78,7 @@ class GraphExplorer:
         elif self.pending is not None:
             self.attempt_actions += 1
         self.attempt.push(observation.grid, self.pending[1] if self.pending else None)
+        self.last_grid = observation.grid
 
         key = state_hash(observation.grid, self.mask)
         if self.pending is not None:
@@ -92,7 +96,10 @@ class GraphExplorer:
     def _on_game_over(self) -> None:
         self.diagnostics["game_overs"] += 1
         died_at = self.attempt_actions + 1  # the pending action counts
-        expired = self.budget_aware and self.budget is not None and died_at >= self.budget
+        expired = self.budget_aware and (
+            self._bar_drained()
+            or (self.budget is not None and died_at >= self.budget)
+        )
         if self.pending is not None:
             src, action = self.pending
             if expired:
@@ -103,6 +110,15 @@ class GraphExplorer:
         self._close_attempt()
         self._learn_budget()
         self._forget_position()
+
+    def _bar_drained(self) -> bool:
+        """True when the learned bar cells read as empty in the last frame before death."""
+        if not self.drain_values or self.last_grid is None:
+            return False
+        grid = self.last_grid
+        hits = sum(1 for (y, x), v in self.drain_values.items()
+                   if y < grid.shape[0] and x < grid.shape[1] and grid[y, x] == v)
+        return hits / len(self.drain_values) >= DRAINED_FRACTION
 
     def _close_attempt(self) -> None:
         if self.attempt.length >= 2:
@@ -122,8 +138,17 @@ class GraphExplorer:
             return
         if self.mask is None or mask.shape != self.mask.shape or not np.array_equal(mask, self.mask):
             self.mask = mask
+            self.drain_values = self._drain_values(mask)
             self.diagnostics["mask_cells"] = int(mask.sum())
             self._rebuild_graph()
+
+    def _drain_values(self, mask: np.ndarray) -> dict[tuple[int, int], int]:
+        values: dict[tuple[int, int], int] = {}
+        for sig in self.attempts:
+            for cell, (_offset, value) in sig.once.items():
+                if mask[cell] and cell not in values:
+                    values[cell] = value
+        return values
 
     def _learn_budget(self) -> None:
         if not self.budget_aware or self.budget is not None:
@@ -221,6 +246,8 @@ class GraphExplorer:
         self.graph = StateGraph(self.max_nodes)
         self.trace = []
         self.mask = None
+        self.drain_values = {}
+        self.last_grid = None
         self.budget = None
         self.attempts = []
         self.attempt = AttemptSignature()
