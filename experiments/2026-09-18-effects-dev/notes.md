@@ -1,28 +1,21 @@
-# 2026-09-18-effects-dev
+# 2026-09-18-effects-dev (superseded by predicted-edges: effects without predicted edges lost graph connectivity; 8 median levels)
 
-- What changed: TODO
-- Result vs baseline: TODO
-- Keep or drop: TODO
-
-```
-game   levels/seed    med lv med score  actions  states  wall s
-cn04   [0, 0, 0]           0       0.0     1000   302.7    8.96
-ft09   [0, 0, 1]           0       0.0     1000   155.3     4.4
-g50t   [0, 0, 0]           0       0.0     1000    40.3   10.57
-ka59   [0, 0, 0]           0       0.0     1000     193    5.28
-lp85   [1, 1, 1]           1      1.82     1000     9.7    1.92
-ls20   [0, 0, 0]           0       0.0     1000   851.7    18.1
-m0r0   [0, 0, 1]           0       0.0     1000     5.7   14.24
-r11l   [1, 1, 1]           1      4.76     1000     255    5.74
-re86   [0, 0, 0]           0       0.0     1000     277    9.67
-s5i5   [1, 0, 1]           1       0.0     1000   116.7    2.39
-sb26   [0, 0, 0]           0       0.0     1000     320   10.97
-sc25   [0, 0, 0]           0       0.0     1000   513.3    9.04
-sk48   [0, 0, 0]           0       0.0     1000     279   10.42
-sp80   [1, 1, 1]           1      0.03     1000   111.7   11.36
-su15   [1, 1, 1]           1       0.0     1000     294    5.91
-tu93   [2, 1, 1]           1       0.0     1000      35    7.35
-vc33   [2, 2, 2]           2      0.19     1000     129    4.46
-wa30   [0, 0, 0]           0       0.0     1000      87    5.62
-TOTAL  games=18 seeds=3 sum_median_levels=8 mean_median_score=0.38 actions/level=2076.9 wall=439.3s fallbacks=0
-```
+- What changed: `effects` flag. Click effects by object signature (colour+shape+size) and
+  non-move key effects by avatar appearance, as relative diffs; a signature consistent 3 times
+  is global. Predictable actions that are no-ops or lead to a state already in the graph are
+  not executed; they enter the graph as edges marked `predicted` so BFS keeps its connectivity,
+  and execution later overwrites them. Same for predictable moves (vacated cells filled with the
+  learned floor colour). Planner disabling is now rate-based (>= 3 mispredictions and >= 25% of
+  checked predictions) and counted per event, not per cell.
+- Result: dev 3 seeds, 1000 choices: **9 median levels**, RHAE 0.37. cn04 level 1 won on two
+  seeds (first median win on cn04), tu93 [1,2,2], s5i5 down to [0,0,1], m0r0 0 this run.
+  Re-test share (accounting, seed 0): still ~75%. cn04 ACTION5 563 and re86 ACTION5 488 of
+  1000: each rotation is predictable but leads to a never-visited state, which the current rule
+  still visits. Click games unchanged (s5i5 844, su15 697): their effects depend on position or
+  timing, not on the object signature.
+- Verdict: keep (no regression, cn04 gain, connectivity restored), criterion still not met.
+- Why the criterion cannot be met by step 2 alone: under an exploration objective, "known
+  mechanic in a new state" is how new states get visited; prediction removes the need to visit
+  only when the goal says the state is irrelevant. The accounting's "retest" mixes true waste
+  (predictable, into a known state: now removed) with exploration by known mechanics (predictable,
+  into a new state: still needed without a goal).

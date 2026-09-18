@@ -98,3 +98,10 @@ Implementation details belong in DECISIONS.md, not here. Mark unverified beliefs
   the walk; ours costs hundreds because every touch is re-tested per state. The
   predicted-state planner plus a "make region A equal region B" hypothesis type is the direct
   translation of this play.
+- 2026-09-18 (`2026-09-18-predicted-edges-dev`) — Skipping a predictable action must not drop
+  its edge: without predicted edges the graph lost connectivity and exhausted early (8 median
+  levels); with them, 9 and cn04's first median win. The deeper lesson: prediction alone cannot
+  remove "known mechanic, new state" actions, which are 75% of what we do, because without a
+  goal every new state is worth a visit. The owner's ls20 notes say the same from the other
+  side: after level 1 a human spends zero actions on known rules because the goal tells them
+  which states matter. The next lever is the goal, not more prediction.

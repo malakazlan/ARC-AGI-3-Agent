@@ -95,3 +95,12 @@ Dev machine: i5-7300HQ, 4 cores, 7.7 GB RAM in WSL. Benchmarks with many seeds w
   and clicks are tested per state; m0r0/ls20 passability undecidable by colour.
 - Merge criterion not met; plan is to extend prediction to key and click effects by signature
   and plan over predicted states (owner decision pending).
+
+## 2026-09-18 — Step 2 closed
+
+- Effects by signature and predicted edges added; rate-based planner reset; 153 tests.
+- Dev: 9 median levels, RHAE 0.37. cn04 first median win. Re-test share ~75%, dominated by
+  predictable actions into never-visited states (cn04/re86 ACTION5 ~500 each), which only a
+  goal can make unnecessary. Owner's ls20 play notes recorded in `docs/HUMAN_PLAY.md`.
+- Next: step 3, win hypotheses (reach colour, click colour, remove all, make region A equal
+  region B) carried across levels and planned over predicted states.
