@@ -15,7 +15,7 @@ def run(game: ToyGame, seed: int = 0, steps: int = 400, **cfg) -> tuple[Orchestr
         if brain.is_done(obs, now=1.0):
             break
         choice = brain.choose(obs, now=1.0)
-        log.append((obs.state, choice))
+        log.append((obs, choice))
         obs = game.apply(choice.action_id, choice.x, choice.y)
     return brain, log
 
@@ -34,7 +34,7 @@ def test_explorer_never_repeats_a_tested_pair_while_a_frontier_exists():
 
 def test_explorer_marks_game_over_edges_and_never_retries_them():
     game = ToyGame(levels=1, extra_cells={(1, 2): 3})   # trap right next to the start
-    brain, log = run(game, steps=80)
+    brain, log = run(game, steps=80, planner=False)     # with the planner it wins before dying
     explorer = brain.policy
     # the trap has up to four approaches; each (state, action) pair may end the game once
     assert 1 <= game.game_overs <= 4
@@ -54,7 +54,7 @@ def test_explorer_clears_both_toy_levels_within_budget():
 def test_same_seed_gives_the_same_trajectory():
     _, log_a = run(ToyGame(), seed=3, steps=200)
     _, log_b = run(ToyGame(), seed=3, steps=200)
-    assert log_a == log_b
+    assert [c for _, c in log_a] == [c for _, c in log_b]
 
 
 def test_graph_is_reset_on_every_level_change():
@@ -93,7 +93,7 @@ def test_explorer_diagnostics_are_exported_through_the_orchestrator():
 
 def test_explorer_learns_the_countdown_mask_after_two_attempts():
     game = ToyGame(levels=1, budget=12)
-    brain, _ = run(game, steps=60)
+    brain, _ = run(game, steps=60, planner=False)
     explorer = brain.policy
     assert game.game_overs >= 2
     assert explorer.mask is not None and explorer.mask[7].any()
@@ -102,10 +102,10 @@ def test_explorer_learns_the_countdown_mask_after_two_attempts():
 
 def test_budget_deaths_are_not_recorded_as_lethal_edges():
     game = ToyGame(levels=1, budget=12)
-    brain, _ = run(game, steps=80)
+    brain, _ = run(game, steps=80, planner=False)
     explorer = brain.policy
     assert explorer.diagnostics["budget_deaths"] >= 1
-    assert explorer.budget == 12
+    assert explorer.budget == 12          # diagnostic cadence; expiry itself is read from the bar
     # after the budget is known, no edge in the graph is marked game_over by an expiry
     lethal = sum(1 for node in explorer.graph.nodes.values() for e in node.tested.values() if e.game_over)
     assert lethal == 0
@@ -119,7 +119,7 @@ def test_masked_state_space_is_small_despite_the_bar():
 
 def test_explorer_still_clears_a_level_with_a_budget_bar():
     game = ToyGame(levels=1, budget=40)
-    brain, _ = run(game, steps=1500)
+    brain, _ = run(game, steps=1500, planner=False)
     assert game.levels_completed == 1
 
 
@@ -130,11 +130,13 @@ def test_countdown_masking_can_be_disabled_by_config():
 
 
 def test_expiry_is_read_from_the_bar_not_the_clock():
-    """Once the bar is known, a death with the bar empty is expiry; with the bar full it is not."""
+    """Once the bar is known, a death with the bar empty is expiry; with the bar full it is not.
+    (planner off: these tests exercise the bar logic; a deterministic planner replays the same
+    opening, which by design gives the independence rule no evidence.)"""
     import numpy as np
 
     game = ToyGame(levels=1, budget=12)
-    brain, _ = run(game, steps=60)
+    brain, _ = run(game, steps=60, planner=False)
     explorer = brain.policy
     assert explorer.mask is not None and explorer.drain_values
     empty = game.grid.copy()
@@ -180,10 +182,14 @@ def test_dead_click_classes_are_explored_last():
 def test_lethal_commit_is_deferred_after_two_deaths():
     game = ToyGame(levels=1, available=[1, 2, 3, 4, 5], extra_cells={(6, 6): 7})
     brain, log = run(game, steps=400)
-    commits = sum(1 for _, c in log if c.action_id == 5)
-    assert game.game_overs <= 4
-    assert commits <= game.game_overs + 2
-    assert brain.policy.prior.deferred((5,)) or game.levels_completed == 1
+    ex = brain.policy
+    assert ex.prior.deferred((5,)) or game.levels_completed == 1
+    # once deferred, the commit is only pressed when nothing live is left: every later press
+    # is a deferred pick, and it is never pressed twice from the same state
+    presses = [(o.grid.tobytes(), c) for o, c in log if c.action_id == 5 and o.grid is not None]
+    states = [g for g, _ in presses]
+    assert len(states) == len(set(states))
+    assert ex.diagnostics["deferred_picks"] >= len(presses) - 2
 
 
 def test_deferred_actions_still_get_tested_when_nothing_else_is_left():

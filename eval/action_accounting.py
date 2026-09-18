@@ -87,10 +87,16 @@ def account(game_id: str, seed: int, max_actions: int, baselines: dict[str, list
         expired = died and bool(getattr(explorer, "_bar_drained", lambda: False)())
         cat = classify(choice.reason, tries_before, changed, died, expired)
         per_level[cat] += 1
+        if cat == "retest":
+            per_level[f"retest_A{choice.action_id}"] += 1
         if obs.levels_completed > level:
             human = baselines.get(game_id, [])
             rows.append({"game": game_id, "level": level + 1, "human": human[level] if level < len(human) else None,
-                         **{c: per_level[c] for c in CATEGORIES}, "total": sum(per_level.values())})
+                         **{c: per_level[c] for c in CATEGORIES},
+                         "total": sum(v for k, v in per_level.items() if not k.startswith("retest_")),
+                         "retest_by_action": {k[7:]: v for k, v in per_level.items() if k.startswith("retest_")},
+                         "planner": {k: explorer.diagnostics.get(k) for k in
+                                     ("retests_avoided", "planned_moves", "mismatches", "planner_resets", "avatar_known_at")}})
             per_level = Counter()
             level = obs.levels_completed
     return rows
@@ -113,7 +119,7 @@ def main() -> None:
     for r in rows:
         t = r["total"] or 1
         print(f"{r['game']:6} {r['level']:>3} {str(r['human']):>5} {r['total']:>5} {r['learn']:>5} {r['retest']:>6} {r['navigate']:>5} {r['waste']:>5}  "
-              f"{100 * r['learn'] / t:>5.0f}% {100 * r['waste'] / t:>5.0f}%")
+              f"{100 * r['learn'] / t:>5.0f}% {100 * r['waste'] / t:>5.0f}%   retest by action {r['retest_by_action']}  planner {r['planner']}")
         for c in CATEGORIES + ("total",):
             tot[c] += r[c]
     t = tot["total"] or 1

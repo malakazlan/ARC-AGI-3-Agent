@@ -98,6 +98,12 @@ def run_one(arc: Any, MyAgent: Any, game_id: str, seed: int, max_actions: int,
         "capped": diagnostics.get("capped", 0),
         "resets": diagnostics.get("resets", 0),
         "fallbacks": diagnostics.get("fallbacks", 0),
+        "retests_avoided": diagnostics.get("retests_avoided", 0),
+        "planned_moves": diagnostics.get("planned_moves", 0),
+        "mismatches": diagnostics.get("mismatches", 0),
+        "planner_resets": diagnostics.get("planner_resets", 0),
+        "avatar_known_at": diagnostics.get("avatar_known_at"),
+        "budget_deaths": diagnostics.get("budget_deaths", 0),
     }
 
 

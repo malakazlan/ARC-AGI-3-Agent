@@ -1,5 +1,45 @@
 [
   {
+    "game": "m0r0",
+    "level": 1,
+    "human": 30,
+    "learn": 29,
+    "retest": 157,
+    "navigate": 3,
+    "waste": 176,
+    "total": 365
+  },
+  {
+    "game": "sp80",
+    "level": 1,
+    "human": 39,
+    "learn": 45,
+    "retest": 416,
+    "navigate": 76,
+    "waste": 22,
+    "total": 559
+  },
+  {
+    "game": "tu93",
+    "level": 1,
+    "human": 19,
+    "learn": 12,
+    "retest": 278,
+    "navigate": 96,
+    "waste": 6,
+    "total": 392
+  },
+  {
+    "game": "tu93",
+    "level": 2,
+    "human": 16,
+    "learn": 0,
+    "retest": 242,
+    "navigate": 34,
+    "waste": 8,
+    "total": 284
+  },
+  {
     "game": "lp85",
     "level": 1,
     "human": 17,
@@ -8,16 +48,6 @@
     "navigate": 0,
     "waste": 1,
     "total": 21
-  },
-  {
-    "game": "m0r0",
-    "level": 1,
-    "human": 30,
-    "learn": 13,
-    "retest": 353,
-    "navigate": 3,
-    "waste": 120,
-    "total": 489
   },
   {
     "game": "r11l",
@@ -40,44 +70,14 @@
     "total": 658
   },
   {
-    "game": "sp80",
-    "level": 1,
-    "human": 39,
-    "learn": 49,
-    "retest": 593,
-    "navigate": 236,
-    "waste": 75,
-    "total": 953
-  },
-  {
     "game": "su15",
     "level": 1,
     "human": 22,
-    "learn": 22,
-    "retest": 581,
-    "navigate": 43,
-    "waste": 20,
-    "total": 666
-  },
-  {
-    "game": "tu93",
-    "level": 1,
-    "human": 19,
-    "learn": 12,
-    "retest": 316,
-    "navigate": 154,
-    "waste": 9,
-    "total": 491
-  },
-  {
-    "game": "tu93",
-    "level": 2,
-    "human": 16,
-    "learn": 0,
-    "retest": 126,
-    "navigate": 2,
-    "waste": 2,
-    "total": 130
+    "learn": 26,
+    "retest": 697,
+    "navigate": 74,
+    "waste": 26,
+    "total": 823
   },
   {
     "game": "vc33",
@@ -98,15 +98,5 @@
     "navigate": 18,
     "waste": 5,
     "total": 286
-  },
-  {
-    "game": "g50t",
-    "level": 1,
-    "human": 78,
-    "learn": 15,
-    "retest": 573,
-    "navigate": 10,
-    "waste": 105,
-    "total": 703
   }
 ]

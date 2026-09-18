@@ -23,6 +23,10 @@ class Arc3Config:
     # Learn per action class (key id, or click target colour+size) what does nothing or kills;
     # explore those classes last.
     action_prior: bool = True
+    # Learn the avatar, key vectors and per-colour passability; predict moves instead of
+    # re-testing them and plan paths to unknown terrain. Disabled per level after 3 mispredictions.
+    planner: bool = True
+    planner_max_mismatches: int = 3
     # Optional local LLM layer. Off by default; must degrade to rules-only when missing.
     reasoner_enabled: bool = False
 

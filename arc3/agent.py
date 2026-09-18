@@ -114,6 +114,8 @@ class Orchestrator:
                 use_countdown_mask=config.countdown_mask,
                 budget_aware=config.budget_aware,
                 use_action_prior=config.action_prior,
+                use_planner=config.planner,
+                max_mismatches=config.planner_max_mismatches,
             )
         return self._random_policy
 

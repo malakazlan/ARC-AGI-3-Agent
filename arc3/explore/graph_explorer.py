@@ -19,9 +19,13 @@ from typing import Any
 import numpy as np
 
 from arc3.perception import AttemptSignature, countdown_mask_from_signatures, segment_objects, state_hash
-from arc3.plan import path_to_nearest_frontier
+from arc3.plan import path_to_nearest_frontier, plan_moves
 from arc3.types import COMPLEX_ACTION_ID, ActionChoice, ActionKey, Observation
-from arc3.world_model import ActionPrior, StateGraph, click_class
+from arc3.world_model import (
+    ActionPrior, AvatarModel, PassabilityModel, StateGraph, cells_ahead, click_class, predict_move,
+)
+
+MOVE_KEYS = (1, 2, 3, 4)
 
 KEPT_ATTEMPTS = 10  # attempt signatures remembered per level (sparse, tiny)
 DRAINED_FRACTION = 0.9  # bar cells at their drained value => the death was an expiry
@@ -30,13 +34,23 @@ DRAINED_FRACTION = 0.9  # bar cells at their drained value => the death was an e
 class GraphExplorer:
     def __init__(self, rng: random.Random, max_nodes: int = 5000, max_clicks: int = 64,
                  use_countdown_mask: bool = True, budget_aware: bool = True,
-                 use_action_prior: bool = True) -> None:
+                 use_action_prior: bool = True, use_planner: bool = True,
+                 max_mismatches: int = 3) -> None:
         self.rng = rng
         self.max_nodes = max_nodes
         self.max_clicks = max_clicks
         self.use_countdown_mask = use_countdown_mask
         self.budget_aware = budget_aware
         self.prior: ActionPrior | None = ActionPrior() if use_action_prior else None
+        # movement planner: game-level facts (avatar, vectors, passability) survive level changes
+        self.avatar: AvatarModel | None = AvatarModel() if use_planner else None
+        self.passability = PassabilityModel()
+        self.max_mismatches = max_mismatches
+        self.planning_enabled = use_planner
+        self.mismatches = 0
+        self.current_grid: np.ndarray | None = None
+        self.expected: tuple[str, frozenset] | None = None  # prediction for the pending move
+        self.move_plan: list[int] = []
         self.graph = StateGraph(max_nodes)
         self.level_index = 0
         self.current_key: str | None = None
@@ -58,6 +72,8 @@ class GraphExplorer:
             "game_over_retries": 0, "exhausted": 0, "capped": 0, "plans": 0, "plan_steps": 0,
             "levels_seen": 0, "win_path_lengths": [], "budget_deaths": 0, "mask_cells": 0,
             "budget": None, "graph_rebuilds": 0, "deferred_picks": 0,
+            "retests_avoided": 0, "mismatches": 0, "planner_resets": 0, "planned_moves": 0,
+            "avatar_known_at": None, "kill_colours": 0,
         }
 
     # -- learning from what happened -------------------------------------------------------
@@ -69,12 +85,15 @@ class GraphExplorer:
         self._last_levels = levels
 
         if observation.state == "GAME_OVER":
+            self._learn_death()
             self._on_game_over()
             return
         if observation.grid is None:
             self._forget_position()
             return
 
+        self._learn_move(observation.grid)
+        self.current_grid = observation.grid
         if self.attempt.length == 0:
             self.attempt_actions = 0
         elif self.pending is not None:
@@ -98,13 +117,89 @@ class GraphExplorer:
         self.current_key = key
         self._sync_counters()
 
+    # -- avatar, passability and prediction checks ------------------------------------------
+
+    def _learn_move(self, grid: np.ndarray) -> None:
+        """After a key press: update the avatar model, passability votes and the prediction check."""
+        if self.avatar is None or self.pending is None or self.last_grid is None:
+            self.expected = None
+            return
+        key = self.pending[1][0]
+        if key not in MOVE_KEYS or self.last_grid.shape != grid.shape:
+            self.expected = None
+            return
+        before = self.last_grid
+        old_cells = self.avatar.last_cells if self.avatar.confident else None
+        was_confident = self.avatar.confident
+        outcome = self.avatar.observe(before, key, grid, self.mask)
+        if not was_confident and self.avatar.confident and self.diagnostics["avatar_known_at"] is None:
+            self.diagnostics["avatar_known_at"] = self.trace and len(self.trace)
+        vec = self.avatar.vector(key)
+        if old_cells and vec is not None and self.mask_ok(before):
+            if outcome == "moved" and self.avatar.last_vector.get(key) == vec:
+                for (y, x) in self.avatar.last_cells - old_cells:
+                    self.passability.vote(int(before[y, x]), "passes")
+            elif outcome == "blocked":
+                for (y, x) in self._in_bounds(cells_ahead(old_cells, vec), before.shape):
+                    self.passability.vote(int(before[y, x]), "blocks")
+            if self.expected is not None and outcome in ("moved", "blocked") and outcome != self.expected[0]:
+                for (y, x) in self._in_bounds(cells_ahead(old_cells, vec), before.shape):
+                    self._on_mismatch(int(before[y, x]))
+        self.expected = None
+
+    def _learn_death(self) -> None:
+        """A non-expiry death right after a key press: the colours ahead kill."""
+        if self.avatar is None or self.pending is None or self.last_grid is None or not self.avatar.confident:
+            return
+        key = self.pending[1][0]
+        vec = self.avatar.vector(key)
+        cells = self.avatar.last_cells
+        if key not in MOVE_KEYS or vec is None or not cells or self._bar_drained():
+            return
+        for (y, x) in self._in_bounds(cells_ahead(cells, vec), self.last_grid.shape):
+            self.passability.vote(int(self.last_grid[y, x]), "kills")
+            self.diagnostics["kill_colours"] += 1
+        self.expected = None
+
+    def _on_mismatch(self, colour: int) -> None:
+        self.passability.contradict(colour)
+        self.mismatches += 1
+        self.diagnostics["mismatches"] += 1
+        if self.mismatches >= self.max_mismatches and self.planning_enabled:
+            self.planning_enabled = False
+            self.diagnostics["planner_resets"] += 1
+        self.move_plan = []
+
+    def mask_ok(self, grid: np.ndarray) -> bool:
+        return self.mask is None or self.mask.shape == grid.shape
+
+    @staticmethod
+    def _in_bounds(cells, shape) -> list[tuple[int, int]]:
+        h, w = shape
+        return [(y, x) for (y, x) in cells if 0 <= y < h and 0 <= x < w]
+
+    def _planner_ready(self) -> bool:
+        return (self.avatar is not None and self.planning_enabled and self.avatar.confident
+                and self.current_grid is not None and bool(self.avatar.avatar_cells(self.current_grid)))
+
+    def _known_vectors(self) -> dict[int, tuple[int, int]]:
+        if self.avatar is None:
+            return {}
+        return {k: v for k in MOVE_KEYS if (v := self.avatar.vector(k)) is not None}
+
+    def _prediction(self, key: int) -> tuple[str, frozenset] | None:
+        if not self._planner_ready():
+            return None
+        vec = self.avatar.vector(key)  # type: ignore[union-attr]
+        if vec is None:
+            return None
+        cells = self.avatar.avatar_cells(self.current_grid)  # type: ignore[union-attr]
+        return predict_move(self.current_grid, cells, vec, self.passability)  # type: ignore[arg-type]
+
     def _on_game_over(self) -> None:
         self.diagnostics["game_overs"] += 1
         died_at = self.attempt_actions + 1  # the pending action counts
-        expired = self.budget_aware and (
-            self._bar_drained()
-            or (self.budget is not None and died_at >= self.budget)
-        )
+        expired = self.budget_aware and self._bar_drained()
         if self.pending is not None:
             src, action = self.pending
             if expired:
@@ -161,13 +256,14 @@ class GraphExplorer:
         return values
 
     def _learn_budget(self) -> None:
-        if not self.budget_aware or self.budget is not None:
+        """Diagnostic only: the most common death cadence. A deterministic policy dies at the
+        same step count for non-budget reasons too, so this never drives decisions."""
+        if self.budget is not None:
             return
         length, count = self.death_lengths.most_common(1)[0]
         if count >= 2:
             self.budget = length
             self.diagnostics["budget"] = length
-            self._rebuild_graph()  # earlier expiries were recorded as lethal edges
 
     def _rebuild_graph(self) -> None:
         self.graph = StateGraph(self.max_nodes)
@@ -185,16 +281,18 @@ class GraphExplorer:
             edge = self.graph.edge(key, action)
             if edge is not None and edge.game_over:
                 self.diagnostics["game_over_retries"] += 1
-            if edge is not None and self.graph.untested(key):
+            if edge is not None and getattr(self, "_live_now", None):
                 self.diagnostics["repeats"] += 1
             self.pending = (key, action)
+        self.expected = self._prediction(action[0]) if action[0] in MOVE_KEYS else None
         self.trace.append(action)
         return ActionChoice(action[0], action[1], action[2], reason)
 
     def _pick(self, key: str | None, observation: Observation) -> tuple[ActionKey, str]:
         if key is None or key not in self.graph:
             return self._random_legal(observation), "graph: state not stored"
-        live = self._live_untested(key)
+        live = self._live_untested(key, count=True)
+        self._live_now = live
         if live:
             self.plan = []
             return self._best(key, live), f"graph: untested ({len(live)} live here)"
@@ -202,6 +300,9 @@ class GraphExplorer:
             _, action = self.plan.pop(0)
             self.diagnostics["plan_steps"] += 1
             return action, f"graph: plan step ({len(self.plan)} left)"
+        move = self._move_toward_unknown()
+        if move is not None:
+            return move
         self.plan = self._plan_from(key, self._has_live_untested)
         if self.plan:
             self.diagnostics["plans"] += 1
@@ -221,11 +322,39 @@ class GraphExplorer:
         self.diagnostics["exhausted"] += 1
         return self._random_legal(observation), "graph: frontier exhausted, random legal"
 
-    def _live_untested(self, key: str) -> list[ActionKey]:
+    def _move_toward_unknown(self) -> tuple[ActionKey, str] | None:
+        """Follow or make a movement plan to the nearest position with an unpredictable key."""
+        if not self._planner_ready():
+            self.move_plan = []
+            return None
+        if not self.move_plan:
+            cells = self.avatar.avatar_cells(self.current_grid)  # type: ignore[union-attr]
+            path = plan_moves(self.current_grid, cells, self._known_vectors(), self.passability, goal=None)  # type: ignore[arg-type]
+            if not path:
+                return None
+            self.move_plan = list(path)
+        key = self.move_plan.pop(0)
+        self.diagnostics["planned_moves"] += 1
+        return (key, None, None), f"planner: toward unknown terrain ({len(self.move_plan)} left)"
+
+    def _live_untested(self, key: str, count: bool = False) -> list[ActionKey]:
         untested = self.graph.untested(key)
-        if self.prior is None:
-            return untested
-        return [a for a in untested if not self.prior.deferred(self.graph.action_class(key, a))]
+        if self.prior is not None:
+            untested = [a for a in untested if not self.prior.deferred(self.graph.action_class(key, a))]
+        if self._planner_ready():
+            # movement is the planner's job: predictable moves here are not worth testing, and
+            # moves at other states are never a graph frontier (unknown terrain is reached by
+            # the movement planner instead)
+            kept = []
+            for a in untested:
+                if a[0] in MOVE_KEYS:
+                    if key != self.current_key or self._prediction(a[0]) is not None:
+                        if count:
+                            self.diagnostics["retests_avoided"] += 1
+                        continue
+                kept.append(a)
+            untested = kept
+        return untested
 
     def _has_live_untested(self, key: str) -> bool:
         return bool(self._live_untested(key))
@@ -296,11 +425,16 @@ class GraphExplorer:
         self.death_lengths = Counter()
         self.diagnostics["mask_cells"] = 0
         self.diagnostics["budget"] = None
+        self.mismatches = 0
+        if self.avatar is not None:
+            self.planning_enabled = True
         self._forget_position()
 
     def _forget_position(self) -> None:
         self.pending = None
         self.plan = []
+        self.move_plan = []
+        self.expected = None
         self.current_key = None
 
     def _sync_counters(self) -> None:
