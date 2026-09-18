@@ -21,6 +21,7 @@ GAME            ?=
 STEPS           ?= 200
 SPLIT           ?= dev
 SEEDS           ?= 3
+WORKERS         ?= 4
 BENCH_ARGS      ?=
 
 .PHONY: help setup play-local pull-sample notebook submit status verify-local test bench clean _check-kaggle
@@ -63,7 +64,7 @@ test: ## Run unit tests (fast, no network)
 	$(VENV_PY) -m pytest -q
 
 bench: ## Benchmark on a split: make bench SPLIT=dev|holdout SEEDS=3 [BENCH_ARGS="--max-actions 500"]
-	$(VENV_PY) eval/benchmark.py --split $(SPLIT) --seeds $(SEEDS) $(BENCH_ARGS)
+	$(VENV_PY) eval/benchmark.py --split $(SPLIT) --seeds $(SEEDS) --workers $(WORKERS) $(BENCH_ARGS)
 
 list-games: ## Show all available games
 	$(VENV_PY) scripts/play_local.py --list

@@ -175,27 +175,44 @@ def write_experiment(folder: Path, results: dict, bench_args: dict) -> None:
         )
 
 
+def _run_job(job: tuple) -> dict:
+    """One (game, seed) run in its own process: its own engine, agent class and clock. Runs are
+    deterministic and independent, so parallel results equal sequential ones."""
+    game_id, seed, max_actions, time_per_game_s, overrides, traces_dir = job
+    logging.disable(logging.CRITICAL)
+    arc = arc_agi.Arcade(operation_mode=OperationMode.OFFLINE, environments_dir=str(ROOT / "environment_files"))
+    MyAgent = load_my_agent_class()
+    return run_one(arc, MyAgent, game_id, seed, max_actions, time_per_game_s, overrides, traces_dir=traces_dir)
+
+
 def run(games: list[str], seeds: list[int], max_actions: int, time_per_game_s: float,
         experiment_id: str, experiments_dir: Path = EXPERIMENTS_DIR,
-        overrides: dict | None = None, quiet: bool = True, traces: bool = False) -> dict:
+        overrides: dict | None = None, quiet: bool = True, traces: bool = False,
+        workers: int = 1) -> dict:
     if quiet:
         logging.disable(logging.CRITICAL)
     overrides = overrides or {}
-    # OFFLINE: every public game is cached under environment_files/, and no network is needed
-    # (the NORMAL mode fetches an anonymous API key first and dies without a connection)
-    arc = arc_agi.Arcade(operation_mode=OperationMode.OFFLINE, environments_dir=str(ROOT / "environment_files"))
-    MyAgent = load_my_agent_class()
     runs: list[dict] = []
     started = time.time()
     traces_dir = Path(experiments_dir) / experiment_id / "traces" if traces else None
-    for seed in seeds:
-        for game_id in games:
-            result = run_one(arc, MyAgent, game_id, seed, max_actions, time_per_game_s, overrides,
-                             traces_dir=traces_dir)
-            runs.append(result)
-            print(f"  seed={seed} {game_id:6} levels={result.get('levels_completed', '?'):>2} "
-                  f"score={result.get('score', 0):>6} actions={result.get('actions', 0):>5} "
-                  f"states={result.get('states', 0):>5} wall={result.get('wall_s', 0):>6}s", flush=True)
+    jobs = [(game_id, seed, max_actions, time_per_game_s, overrides, traces_dir) for seed in seeds for game_id in games]
+    if workers > 1:
+        from concurrent.futures import ProcessPoolExecutor
+
+        with ProcessPoolExecutor(max_workers=workers) as pool:
+            results = list(pool.map(_run_job, jobs))
+    else:
+        # OFFLINE: every public game is cached under environment_files/, and no network is needed
+        # (the NORMAL mode fetches an anonymous API key first and dies without a connection)
+        arc = arc_agi.Arcade(operation_mode=OperationMode.OFFLINE, environments_dir=str(ROOT / "environment_files"))
+        MyAgent = load_my_agent_class()
+        results = [run_one(arc, MyAgent, g, sd, max_actions, time_per_game_s, overrides, traces_dir=traces_dir)
+                   for (g, sd, *_rest) in jobs]
+    for (game_id, seed, *_rest), result in zip(jobs, results):
+        runs.append(result)
+        print(f"  seed={seed} {game_id:6} levels={result.get('levels_completed', '?'):>2} "
+              f"score={result.get('score', 0):>6} actions={result.get('actions', 0):>5} "
+              f"states={result.get('states', 0):>5} wall={result.get('wall_s', 0):>6}s", flush=True)
     bench_args = {"bench_games": games, "bench_seeds": seeds, "bench_max_actions": max_actions,
                   "bench_time_per_game_s": time_per_game_s, "bench_overrides": overrides}
     results = {
@@ -224,13 +241,14 @@ def main() -> None:
     p.add_argument("--id", default=None, help="experiment id (default <date>-<split>-<sha>)")
     p.add_argument("--config", default="{}", help="JSON overrides for Arc3Config")
     p.add_argument("--traces", action="store_true", help="record per-step frames to <id>/traces/")
+    p.add_argument("--workers", type=int, default=1, help="parallel processes (runs are independent)")
     args = p.parse_args()
 
     games = args.games.split(",") if args.games else games_for_split(args.split)
     tag = "custom" if args.games else args.split
     experiment_id = args.id or f"{date.today().isoformat()}-{tag}-{git_sha()}"
     run(games, list(range(args.seeds)), args.max_actions, args.time_per_game, experiment_id,
-        overrides=json.loads(args.config), traces=args.traces)
+        overrides=json.loads(args.config), traces=args.traces, workers=args.workers)
 
 
 if __name__ == "__main__":
