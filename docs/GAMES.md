@@ -122,3 +122,72 @@ store to the next level, and demote the hypothesis on contradiction. What the pu
 teaches is which perceptual cues are reliable (section 3) and which goal templates recur
 (resemblance, count-to-zero, reach); what it cannot teach is the private set's new mechanics,
 which is why every rule is a hypothesis tested by one touch, never a fact.
+
+
+## 5. Coverage table from the VISTA notes (2026-09-18, second pass)
+
+Source: the final `GUIDE.md` of the VISTA agent (Claude Opus 5) on every public game, mined
+from vista-research.github.io replay data and stored verbatim in `docs/vista_guides/`
+(`summary.json` has per-level agent actions and the action at which the agent first wrote a
+goal into its notes). VISTA's per-level actions are the tightest known non-human baseline
+(7,542 actions for 183 levels vs 17,135 human). Goal templates are design v2 section 5: T1
+match (make A equal B), T2 reach, T3 collect then reach, T4 make uniform, T5 fill or clear
+(count to target), T6 unlock sequence. Tool types are ours: move_key, dial (property cycles on
+touch or key), transporter, refill, lethal, click-select (choose the active object), place
+(put the selected thing on a slot), push/carry, commit key, plus the new ones below.
+
+| game | goal as VISTA states it | template | tools the agent used | goal first written at action | our status |
+|---|---|---|---|---|---|
+| ar25 | pieces of 24px blocks moved in 24px steps (assembly; guide lacks a one-line goal) | not classified | move_key (3 cells), click-select, undo | 4 | no template |
+| bp35 | bubble rises on its own; reach the pink cross | T2 reach + physics (drift) | move_key (L/R only), click, undo | 17 | T2 not built; autonomous drift not modelled |
+| cd82 | a press stamps rows of the selected colour into the canvas; make the canvas match | T1 match (paint) | ring cursor (8 positions), fire press (key 5 / click) | 7 | T1 built for framed displays only; press tool not built |
+| cn04 | select a piece, move/rotate it; win when every prong is paired in a joint | T5 count (unpaired prongs) to zero | click-select, move_key, rotate key (5), grow button | 16 | T5 not built; rotate-by-key = dial partly; select not built |
+| dc22 | walk a dot to the yellow goal; right-panel buttons toggle blocks (terrain) | T2 reach + T6 unlock | move_key (2 cells), click buttons that change terrain | 14 | T2/T6 not built |
+| ft09 | dials are 3x3 mini-maps of neighbours; colour every tile to its target | T1 match per tile (a target pattern) | click cycles a tile's colour (dial) | 1 | dial built for touch; click-dial and derived targets not built |
+| g50t | plug the cable/player into the goal socket (blue ring open on one side) | T2 reach with orientation | move_key (6 cells), rotate (key 5?) | 12 | T2 not built |
+| ka59 | every piece rests on its matching goal outline; pieces slide/launch | T1 match positions (T5 unplaced to zero) | click-select, move_key, launch | 14 | not built; push/launch not modelled |
+| lf52 | peg solitaire; exactly one green peg remains; level 6+ scrolls | T5 clear to one | click jumps; scrolling viewport | 11 | T5 not built; scrolling not modelled |
+| lp85 | (guide is level-local; click puzzle on a block grid) | not classified | click | 5 | no template (our explorer wins L1 by exploration) |
+| ls20 | carried glyph must match the goal box glyph, then enter it; energy, rotator, colour dial, refills | T1 match + T2 enter | move_key (5), dial x2, refill, conveyor, energy | 3 | built (L1, L2 won); L3+ needs the energy subgoal plan |
+| m0r0 | both mirrored agents in the same cell; red cells lethal; keys hold doors open; blocks pushable | T2 reach (joint state) + T6 keys/doors | move_key (both agents), click-select block + push, lethal, key/door | 2 | not built: mirrored pair, keys/doors |
+| r11l | put each blob's centre on its matching ring centre | T1 match positions | click to move blobs | 4 | not built (we win L1 by exploration) |
+| re86 | shapes are line sets; cover the four same-colour dots (a plus); ACTION5 switches the active shape | T1 match (shape onto dots) | select by key 5, move_key (3), shapes deform on a ring | none in notes | select-by-key not built; T1 needs "cover targets" variant |
+| s5i5 | "+" buttons rotate segments (children rotate with them); assemble | not classified (assembly by rotation) | click rotates a segment (dial) | 143 | no template |
+| sb26 | fill slots so the flattened nested-box sequence equals the legend; ACTION5 submits | T1 match sequence | click-select piece, place on slot, commit key 5 | none in notes | select/place/commit not built; T1 sequence variant not built |
+| sc25 | enter the blue C bracket sized like the player; the player can change size | T2 reach + size dial | move_key, size dial | 10 | T2 not built |
+| sk48 | chain-arm collector; the legend shows the required arm contents in order | T1 match sequence (collect in order) | move_key, collect | 16 | no template |
+| sp80 | every stream must end in a castle notch, nothing may reach the grey wall | routing (no template) | move_key (4), commit key 5 | 8 | no template (we win L1 by exploration) |
+| su15 | deliver the HUD-listed objects to the blue delivery slots | T5 fill all slots | click-select, place, undo | 5 | not built (we win L1 by exploration) |
+| tn36 | get the mover onto the frame's interior cell in exactly the budgeted moves | T2 reach with exact step budget | click moves | 5 | T2 not built; exact-count constraint not modelled |
+| tr87 | cycle glyphs at the cursor until the target word matches the key mapping | T1 match (symbolic mapping) | cursor keys, cycle keys (dial) | none in notes | no template (mapping inference) |
+| tu93 | reach the green node, avoid guards (static and hunters) | T2 reach + lethal movers | move_key (6), budget bar | 1 | T2 partly (we reach by exploration), pursuers not modelled |
+| vc33 | buttons move material between chambers; bring the player marker to the matching marker | T2 reach through T6 (levels as terrain) | click buttons (transfer N units) | 9 | no template (we win L1-L2 by exploration) |
+| wa30 | deposit every blue box inside the lock | T5 count (boxes outside lock) to zero | move_key, carry/deposit | 40 | T5 not built; carry not modelled |
+
+Counts: T1 match in some variant 9 games, T2 reach 9, T5 count/fill 5, T6 as a sub-mechanic
+3, no template 6 (ar25, lp85, s5i5, sp80, tr87, and re86's cover-the-dots which is T1 only
+with a "cover" variant). Built today: T1 for framed displays (1 game as stated, ls20), T2 by
+exploration only. The two templates that cover the most games with the least mechanism are
+T2 reach (a rare static object or a marked cell) and T5 count-to-target, which is what the
+win probe said from our own traces. Tools absent from our store that recur: click-select of
+an active object (cn04, ka59, m0r0, sb26, su15, re86 by key), place-on-slot (sb26, su15),
+push/carry (ka59, m0r0, wa30), commit key (sb26, sp80), autonomous movers (bp35, tu93).
+
+How VISTA found the goal in the first ten actions (from the replay reasoning):
+- m0r0: action 1, one key press: "Both cyan blocks moved up one cell together, they're two
+  co-controlled agents in a maze"; by action 2 the note reads "Hypothesis: goal = make the
+  two agents occupy the same cell"; action 3 discovers the mirrored horizontal control from a
+  blocked move. Goal from co-movement of two identical rare objects plus the "same cell"
+  prior, before any win.
+- re86: three actions (a move, ACTION5, a move): "ACTION5 toggles which cross is selected
+  (white center pixel = selected)"; "Hypothesis: place each cross so all 4 same-color dots lie
+  on its arms", with the four dots' coordinates and the target cross positions computed and
+  a full plan written at action 2. Goal from colour correspondence between the movable
+  crosses and static dot groups.
+- cn04: four actions (a move, three ACTION5 presses, a click) before a plan; the goal
+  ("every prong paired in a joint") came after seeing prongs meet and render grey.
+  Goal from an observed effect (joint colour) plus counting what remains unpaired.
+In all three the goal is stated after 1 to 4 actions and before any level is won; the
+evidence is object correspondence (same colour, same count, same shape) between what moves
+and what stays. That is resemblance in our terms, applied to positions and counts, not only
+to framed displays.

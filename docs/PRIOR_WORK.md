@@ -209,6 +209,52 @@ true waste, sp80 L1 928 actions 51% true waste, su15 L1 444 actions 75%, tu93 L1
   exploration targets. This is the smallest formalism that makes a rule transfer from level 1
   to level 4.
 
+## 10. The frontier-API harnesses: VISTA, Tycho, Retrodict, Schema (all 98–100 RHAE on the public set)
+
+Common limitation first: every one of these runs Claude Opus 5 or GPT-5.6 through an API,
+at 27 to 660 million tokens and 650 to 3,000 USD per 25-game pass. None is offline, none runs
+on Kaggle, and the public games are in those models' training windows (the foundation says
+so). What transfers is the harness shape and the per-game evidence, not the scores.
+
+- VISTA (vista-research.github.io, MIT): no program synthesis. The model sees the raw frame
+  as a 512x512 image, keeps every frame in a lossless memory it can `inspect` and
+  `read_pixels`, writes free-form notes in `GUIDE.md` (durable, per game) and `WORKING.md`
+  (per level), and must state the expected visual outcome before each action. 7,542 actions
+  for 183 levels (Opus 5), 56% fewer than the human baseline; per-level numbers are in
+  `docs/vista_guides/summary.json`. What we take: the notes are the best available
+  description of every public game's goal and tools (mined into `docs/GAMES.md` section 5);
+  the "state what you expect, then act" rule is our prediction check; the goal appears in the
+  notes after 1 to 4 actions on m0r0, re86, cn04 and comes from object correspondence
+  (same colour, same count, same shape between what moves and what stays).
+- Tycho (arXiv 2607.28287): a coding agent that builds a programmatic world model per game,
+  with a typed interaction history separating decision frames from transient, completion,
+  fatal and reset frames. Its best policy is "actor-requested delegation" to a model-builder
+  subagent (88.49 RHAE with Opus 4.8; 100 with Opus 5 and GPT-5.6). Its own finding: "transition
+  match indicates whether a simulator reproduces observed dynamics, not whether it has
+  identified the objective" (sk48: correct mechanics, unresolved objective). What we take: the
+  frame typing (we have decision vs animation vs restart; we lack completion vs fatal as
+  types), and the warning that a perfect transition model does not find the goal.
+- Retrodict (github.com/ryanbbrown/Retrodict): 99.86 RHAE, 7,703 actions, 660M tokens, GPT-5.6.
+  "Every action the agent claims to understand must carry an `expect` computed in python
+  before it is played"; hypotheses are falsified for free by replaying them over the logged
+  frames ("if any recorded frame contradicts it, it's falsified"); a playbook survives context
+  resets; a simulator is built only after 300 stalled actions. What we take: retrodiction is
+  exactly our offline trace probes turned into a runtime habit: before a rule enters the
+  store, it must explain every frame already seen this game. Cheap for us, since our rules are
+  small.
+- Schema (schema-harness.github.io, dataset guanning/arc-agi-3-schema-traces-opus48): ~99 on
+  the public set; the Opus 4.8 traces on all 25 games are public (85.78 RHAE, 14 games at
+  100). What we take: another set of per-game trajectories to mine when we need action-level
+  baselines beyond VISTA.
+
+Why our design differs on purpose: these systems put the whole loop in the model and pay
+for it in tokens; the foundation's own position is that such harnesses "are not a useful
+way to measure AGI progress, as their performance on seen environments does not translate
+to unseen environments". Our rule engine does the cheap general part (objects, avatar, bar,
+deaths, effects by class, planning, cross-level reuse); templates cover the goal families the
+coverage table shows; a small local model, if it ever comes in, only names goals where no
+template fits, and is measured per family before it stays.
+
 ## Cross-cutting
 
 - Every strong source separates three things we still mix: what changes on its own (HUD,
