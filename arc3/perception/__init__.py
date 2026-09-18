@@ -11,6 +11,7 @@ from arc3.perception.grid import (
     state_hash,
     volatility_mask,
 )
+from arc3.perception.motion import Translation, find_translation
 
 __all__ = [
     "AttemptSignature",
@@ -22,4 +23,6 @@ __all__ = [
     "segment_objects",
     "state_hash",
     "volatility_mask",
+    "Translation",
+    "find_translation",
 ]

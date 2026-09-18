@@ -23,6 +23,7 @@ class GridObject:
     bbox: BBox
     centroid: tuple[float, float]  # (y, x)
     anchor: tuple[int, int]  # (y, x) cell inside the object nearest its centroid
+    cells: tuple[tuple[int, int], ...] = ()  # every (y, x) of the object, sorted
 
 
 def frame_diff(a: np.ndarray, b: np.ndarray) -> FrameDiff:
@@ -231,6 +232,7 @@ def _object_from_cells(color: int, cells: list[tuple[int, int]]) -> GridObject:
         bbox=(min(ys), min(xs), max(ys), max(xs)),
         centroid=(cy, cx),
         anchor=anchor,
+        cells=tuple(sorted(cells)),
     )
 
 

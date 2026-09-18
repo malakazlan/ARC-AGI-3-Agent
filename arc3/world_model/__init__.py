@@ -1,6 +1,21 @@
-"""World model: the graph of explored states, and what each action class tends to do."""
+"""World model: the graph of explored states, what each action class tends to do, which
+object the keys move, and what clicking an object signature does."""
 
-from arc3.world_model.effects import ActionClass, ActionPrior, action_class, click_class
+from arc3.world_model.avatar import AvatarModel
+from arc3.world_model.effects import (
+    ActionClass,
+    ActionPrior,
+    ClickEffects,
+    Effect,
+    action_class,
+    click_class,
+    object_signature,
+    relative_diff,
+    shape_key,
+)
 from arc3.world_model.graph import Edge, Node, StateGraph
 
-__all__ = ["ActionClass", "ActionPrior", "Edge", "Node", "StateGraph", "action_class", "click_class"]
+__all__ = [
+    "ActionClass", "ActionPrior", "AvatarModel", "ClickEffects", "Edge", "Effect", "Node",
+    "StateGraph", "action_class", "click_class", "object_signature", "relative_diff", "shape_key",
+]
