@@ -21,8 +21,8 @@ def test_goal_and_confidence_carry_over_and_can_be_demoted():
     store.propose_goal(Goal("match_display", {"pair": 0}, confidence=0.6))
     store.new_level(1)
     assert store.goal is not None and store.goal.template == "match_display"
-    store.demote_goal(0.3)
-    assert store.goal.confidence == 0.3
+    store.demote_goal(0.2)
+    assert store.goal.confidence == 0.4
     store.demote_goal(0.4)
     assert store.goal is None            # below the floor: dropped
 

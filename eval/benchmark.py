@@ -181,7 +181,9 @@ def run(games: list[str], seeds: list[int], max_actions: int, time_per_game_s: f
     if quiet:
         logging.disable(logging.CRITICAL)
     overrides = overrides or {}
-    arc = arc_agi.Arcade(operation_mode=OperationMode.NORMAL)
+    # OFFLINE: every public game is cached under environment_files/, and no network is needed
+    # (the NORMAL mode fetches an anonymous API key first and dies without a connection)
+    arc = arc_agi.Arcade(operation_mode=OperationMode.OFFLINE, environments_dir=str(ROOT / "environment_files"))
     MyAgent = load_my_agent_class()
     runs: list[dict] = []
     started = time.time()
