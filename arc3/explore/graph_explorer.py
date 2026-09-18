@@ -699,8 +699,11 @@ class GraphExplorer:
             stats = self.prior.stats.get(self.graph.action_class(key, a))  # type: ignore[union-attr]
             return stats.tries if stats else 0
 
-        scored = [(self.breadth_first and tries(a) == 0, self.prior.score(self.graph.action_class(key, a)),
-                   self.rng.random(), a) for a in tier]
+        # breadth-first over the move keys only: pressing each direction once is what elects the
+        # avatar and shows the bar draining under different keys; over clicks and other keys it
+        # spent the early budget on classes the prior already ranks (cost su15 and tu93)
+        scored = [(self.breadth_first and a[0] in MOVE_KEYS and tries(a) == 0,
+                   self.prior.score(self.graph.action_class(key, a)), self.rng.random(), a) for a in tier]
         return max(scored)[3]
 
     def _plan_from(self, key: str, is_frontier) -> list[tuple[str, ActionKey]]:

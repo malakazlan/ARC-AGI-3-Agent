@@ -33,7 +33,7 @@ class Arc3Config:
     effects: bool = True
     # Ablation switches for the two discovery changes of 2026-09-18.
     dial_cap: bool = False       # skip confirmed key dials on avatar games (costs su15/tu93 with breadth-first)
-    breadth_first: bool = False  # try every action class once before repeating any (with the cap, costs su15/tu93)
+    breadth_first: bool = True   # try every move key once before repeating any (elects the avatar, shows the bar)
     # Optional local LLM layer. Off by default; must degrade to rules-only when missing.
     reasoner_enabled: bool = False
 

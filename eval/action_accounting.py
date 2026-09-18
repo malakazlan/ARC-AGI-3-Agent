@@ -3,9 +3,14 @@
 Drives the engine with the orchestrator directly (no framework) so every choice's reason is
 known, and classifies each action up to each level-up:
 
-  learn      first time we test an action class (fewer than LEARNED tries so far): mechanic discovery
-  retest     testing a class we already know, in a new state, and it did change something
-  navigate   following a plan along known edges, or a RESET
+  learn      first time we test an action class (fewer than LEARNED tries so far): mechanic
+             discovery; also the rule policy's probes of unknown objects
+  retest     testing a class we already know, in a new state, and it did change something.
+             Split: `retest_new` led to a state never seen before (exploration by a known
+             mechanic, needed without a goal) vs `retest_known` led back to a state already in
+             the graph (true waste)
+  exploit    the rule policy acting on its hypothesis: touching a dial, a refill, an exit
+  navigate   following a plan along known edges, the rule policy's walks, or a RESET
   waste      no-op outcome of a retest, deferred-class pick, frontier-exhausted random pick,
              or the action that killed us (non-expiry)
 
@@ -33,9 +38,10 @@ from arcengine import GameAction, GameState  # noqa: E402
 
 from arc3.agent import Orchestrator, observation_from_frame  # noqa: E402
 from arc3.config import Arc3Config  # noqa: E402
+from arc3.perception import state_hash  # noqa: E402
 
 LEARNED = 3
-CATEGORIES = ("learn", "retest", "navigate", "waste")
+CATEGORIES = ("learn", "retest", "exploit", "navigate", "waste")
 
 
 def classify(reason: str, tries_before: int, changed: bool, died: bool, expired: bool) -> str:
@@ -43,6 +49,12 @@ def classify(reason: str, tries_before: int, changed: bool, died: bool, expired:
         return "navigate"
     if died and not expired:
         return "waste"
+    if reason.startswith("rules: touch probe"):
+        return "learn"
+    if reason.startswith("rules: touch"):
+        return "exploit"
+    if reason.startswith("rules: walk"):
+        return "navigate"
     if "plan" in reason:
         return "navigate"
     if "exhausted" in reason or "deferred" in reason or "not stored" in reason:
@@ -58,7 +70,7 @@ def account(game_id: str, seed: int, max_actions: int, baselines: dict[str, list
     arc = arc_agi.Arcade(operation_mode=OperationMode.OFFLINE, environments_dir=str(ROOT / "environment_files"))
     env = arc.make(game_id, seed=seed)
     brain = Orchestrator(Arc3Config(seed=seed, max_actions_per_game=max_actions), game_id, started_at=0.0)
-    explorer = brain.policy
+    explorer = getattr(brain.policy, "explorer", brain.policy)   # the rule policy wraps the explorer
     raw = env.observation_space
     obs = observation_from_frame(raw)
     rows: list[dict] = []
@@ -89,10 +101,16 @@ def account(game_id: str, seed: int, max_actions: int, baselines: dict[str, list
         per_level[cat] += 1
         if cat == "retest":
             per_level[f"retest_A{choice.action_id}"] += 1
+            # the explorer has not observed this frame yet: is its state already in the graph?
+            mask = explorer.mask if (explorer.mask is not None and obs.grid is not None
+                                     and explorer.mask.shape == obs.grid.shape) else None
+            known = obs.grid is not None and state_hash(obs.grid, mask) in explorer.graph
+            per_level["retest_known" if known else "retest_new"] += 1
         if obs.levels_completed > level:
             human = baselines.get(game_id, [])
             rows.append({"game": game_id, "level": level + 1, "human": human[level] if level < len(human) else None,
                          **{c: per_level[c] for c in CATEGORIES},
+                         "retest_new": per_level["retest_new"], "retest_known": per_level["retest_known"],
                          "total": sum(v for k, v in per_level.items() if not k.startswith("retest_")),
                          "retest_by_action": {k[7:]: v for k, v in per_level.items() if k.startswith("retest_")},
                          "planner": {k: explorer.diagnostics.get(k) for k in
@@ -101,6 +119,7 @@ def account(game_id: str, seed: int, max_actions: int, baselines: dict[str, list
             level = obs.levels_completed
     if not rows:
         rows.append({"game": game_id, "level": 0, "human": None, **{c: per_level[c] for c in CATEGORIES},
+                         "retest_new": per_level["retest_new"], "retest_known": per_level["retest_known"],
                      "total": sum(v for k, v in per_level.items() if not k.startswith("retest_")),
                      "retest_by_action": {k[7:]: v for k, v in per_level.items() if k.startswith("retest_")},
                      "planner": {k: explorer.diagnostics.get(k) for k in
@@ -120,17 +139,19 @@ def main() -> None:
     rows = []
     for gid in args.games.split(","):
         rows.extend(account(gid, args.seed, args.max_actions, baselines))
-    print(f"{'game':6} {'lvl':>3} {'human':>5} {'total':>5} {'learn':>5} {'retest':>6} {'navig':>5} {'waste':>5}  {'learn%':>6} {'waste%':>6}")
+    print(f"{'game':6} {'lvl':>3} {'human':>5} {'total':>5} {'learn':>5} {'retest':>6} {'(new':>5} {'known)':>6} {'explt':>5} {'navig':>5} {'waste':>5}  {'true waste%':>11}")
     tot = Counter()
     for r in rows:
         t = r["total"] or 1
-        print(f"{r['game']:6} {r['level']:>3} {str(r['human']):>5} {r['total']:>5} {r['learn']:>5} {r['retest']:>6} {r['navigate']:>5} {r['waste']:>5}  "
-              f"{100 * r['learn'] / t:>5.0f}% {100 * r['waste'] / t:>5.0f}%   retest by action {r['retest_by_action']}  planner {r['planner']}")
-        for c in CATEGORIES + ("total",):
+        true_waste = r["waste"] + r["retest_known"]
+        print(f"{r['game']:6} {r['level']:>3} {str(r['human']):>5} {r['total']:>5} {r['learn']:>5} {r['retest']:>6} {r['retest_new']:>5} {r['retest_known']:>6} {r['exploit']:>5} {r['navigate']:>5} {r['waste']:>5}  "
+              f"{100 * true_waste / t:>10.0f}%   retest by action {r['retest_by_action']}  planner {r['planner']}")
+        for c in CATEGORIES + ("total", "retest_new", "retest_known"):
             tot[c] += r[c]
     t = tot["total"] or 1
-    print(f"{'ALL':6} {'':>3} {'':>5} {tot['total']:>5} {tot['learn']:>5} {tot['retest']:>6} {tot['navigate']:>5} {tot['waste']:>5}  "
-          f"{100 * tot['learn'] / t:>5.0f}% {100 * tot['waste'] / t:>5.0f}%")
+    true_waste = tot["waste"] + tot["retest_known"]
+    print(f"{'ALL':6} {'':>3} {'':>5} {tot['total']:>5} {tot['learn']:>5} {tot['retest']:>6} {tot['retest_new']:>5} {tot['retest_known']:>6} {tot['exploit']:>5} {tot['navigate']:>5} {tot['waste']:>5}  "
+          f"{100 * true_waste / t:>10.0f}%")
     out = ROOT / "experiments" / "action_accounting.json"
     out.write_text(json.dumps(rows, indent=2) + "\n")
     print("wrote", out)
