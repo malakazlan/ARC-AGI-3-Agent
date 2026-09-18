@@ -14,7 +14,7 @@ import numpy as np
 
 from arc3.perception.grid import GridObject, segment_objects, shape_key
 
-WINDOW = 4  # maximum displacement accepted, in cells
+WINDOW = 8  # maximum displacement accepted, in cells (ls20 moves 5 per key)
 
 
 @dataclass(frozen=True)
