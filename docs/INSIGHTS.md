@@ -133,3 +133,29 @@ Implementation details belong in DECISIONS.md, not here. Mark unverified beliefs
   front that sweeps monotonically along its long axis, and a cell the avatar has walked over is
   never a bar. The second is world-model-informed perception: once the avatar is known,
   perception should use it.
+- 2026-09-18 (energy on ls20 L2/L3, toys) — Energy is a resource with three things to read and
+  one to plan. Read: (1) the bar within the first attempt: a line whose cells switch off in
+  spatial order at a steady cadence while different keys are pressed, then grown to the whole
+  object it belongs to at the level start (a refill mid-attempt shifts the cross-attempt
+  schedule, so only the bar's front ever agrees across attempts); (2) the rate, as cells lost
+  per action over the last stretch without a rise (L1 one cell, L2 two, L3 four per action);
+  (3) refills, as objects drawn in the bar's colour whose touch makes the bar rise. Plan: a leg
+  is affordable when its length plus a reserve to the nearest refill fits the bar, and a
+  detour once chosen is walked to the end, because re-deciding every step dithers between
+  "refill" and "dial" until the bar is empty. With this ls20 L2 is won in 45 actions. L3 is
+  not: its refills are consumed on use (two rings, each worth one bar), so the level has a hard
+  budget of about 63 actions and the dial-refill-dial round trips spend it. The next lever is
+  the subgoal plan from design v2 section 6 (order dial, colour dial, exit by path cost with
+  the energy projected along the whole route), not more reading.
+- 2026-09-18 (bisect of the 9 -> 5 drop) — At the dial commit, switching the dial cap off
+  alone restored cn04, su15 and tu93 (4 median levels on the three); at HEAD only both flags off
+  together restore su15 and tu93, and cn04 is lost since the "two votes per key" election
+  change (flaky at one level on one or two seeds before it). Lesson: a flag added together
+  with other changes cannot be ablated at a later commit and blamed; ablate at the commit that
+  introduced it. Defaults are now both off; the cap's re-test savings on cn04/re86 were an
+  accounting metric, the levels are the score.
+- 2026-09-18 (ls20 L3 frame) — Level 3 adds a colour dial: a five-colour 3x3 icon. Every ls20
+  tool is a compact multi-colour icon that segmentation splits into pieces, and every refill is
+  drawn in the bar's colour. Two priors that generalise: small touching pieces of different
+  colours are one object; the colour of a resource's display is the colour of the objects that
+  restore it.

@@ -116,3 +116,16 @@ Dev machine: i5-7300HQ, 4 cores, 7.7 GB RAM in WSL. Benchmarks with many seeds w
   detects; energy and refills are the next mechanic.
 - Dev benches running: rule policy vs explorer (no-regression check) and the explorer with the
   fixed detector (to locate the 9 -> 5 drop: cn04, su15, tu93).
+
+## 2026-09-18 — Step 3, energy and level carry-over
+
+- Added: silent-restart recognition, single-attempt bar detector with object growth, energy
+  model (remaining, rate, affordability with a refill reserve), refill discovery by the bar's
+  colour, refill commitment, two-property match report with property-directed dials and delta
+  probes, mask carried across levels. 201 tests. Defaults switched to the rule policy with the
+  dial cap and breadth-first off.
+- ls20: L1 25 actions, L2 45 actions (3/3 seeds in the earlier bench for L1). L3 not won: its
+  refills are consumable and the dial round trips exhaust a ~63-action budget; needs the
+  subgoal plan of design v2 section 6.
+- The 9 -> 5 drop of the morning is explained (dial cap and breadth-first together; cn04 lost
+  at the election change) and su15/tu93 are recovered by the new defaults.
