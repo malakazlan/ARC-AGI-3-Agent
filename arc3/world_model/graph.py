@@ -12,6 +12,7 @@ class Edge:
     changed: bool
     game_over: bool
     level_up: bool
+    predicted: bool = False  # from a learned effect, not yet executed; overwritten when executed
 
 
 @dataclass
@@ -48,16 +49,16 @@ class StateGraph:
         return key in self.nodes
 
     def record(self, src_key: str, action: ActionKey, dst_key: str | None,
-               changed: bool, game_over: bool, level_up: bool) -> None:
+               changed: bool, game_over: bool, level_up: bool, predicted: bool = False) -> None:
         node = self.nodes.get(src_key)
         if node is None:
             return
         previous = node.tested.get(action)
-        if previous is not None and previous.dst_key != dst_key:
+        if previous is not None and previous.dst_key != dst_key and not previous.predicted:
             self.inconsistent += 1
         elif previous is None:
             self.edges += 1
-        node.tested[action] = Edge(dst_key, changed, game_over, level_up)
+        node.tested[action] = Edge(dst_key, changed, game_over, level_up, predicted)
 
     def edge(self, src_key: str, action: ActionKey) -> Edge | None:
         node = self.nodes.get(src_key)

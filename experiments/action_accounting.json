@@ -3,118 +3,50 @@
     "game": "sp80",
     "level": 1,
     "human": 39,
-    "learn": 14,
-    "retest": 56,
-    "navigate": 2,
-    "waste": 2,
-    "total": 74,
+    "learn": 41,
+    "retest": 398,
+    "navigate": 41,
+    "waste": 17,
+    "total": 497,
     "retest_by_action": {
-      "A3": 27,
-      "A1": 29
+      "A3": 180,
+      "A1": 16,
+      "A5": 21,
+      "A6": 12,
+      "A2": 61,
+      "A4": 108
     },
     "planner": {
-      "retests_avoided": 49,
-      "planned_moves": 0,
-      "mismatches": 0,
-      "planner_resets": 0,
+      "retests_avoided": 207,
+      "planned_moves": 6,
+      "mismatches": 3,
+      "planner_resets": 1,
       "avatar_known_at": 31
-    }
-  },
-  {
-    "game": "m0r0",
-    "level": 0,
-    "human": null,
-    "learn": 33,
-    "retest": 599,
-    "navigate": 91,
-    "waste": 277,
-    "total": 1000,
-    "retest_by_action": {
-      "A3": 244,
-      "A4": 243,
-      "A1": 1,
-      "A5": 34,
-      "A6": 76,
-      "A2": 1
-    },
-    "planner": {
-      "retests_avoided": 1938,
-      "planned_moves": 0,
-      "mismatches": 0,
-      "planner_resets": 0,
-      "avatar_known_at": 15
     }
   },
   {
     "game": "cn04",
     "level": 0,
     "human": null,
-    "learn": 22,
-    "retest": 882,
+    "learn": 37,
+    "retest": 860,
     "navigate": 16,
-    "waste": 80,
+    "waste": 87,
     "total": 1000,
     "retest_by_action": {
-      "A3": 78,
-      "A4": 41,
-      "A5": 710,
-      "A1": 9,
-      "A6": 37,
-      "A2": 7
+      "A3": 123,
+      "A4": 88,
+      "A5": 563,
+      "A2": 12,
+      "A1": 25,
+      "A6": 49
     },
     "planner": {
-      "retests_avoided": 390,
+      "retests_avoided": 720,
       "planned_moves": 0,
       "mismatches": 0,
       "planner_resets": 0,
       "avatar_known_at": 6
-    }
-  },
-  {
-    "game": "ka59",
-    "level": 0,
-    "human": null,
-    "learn": 46,
-    "retest": 772,
-    "navigate": 21,
-    "waste": 161,
-    "total": 1000,
-    "retest_by_action": {
-      "A3": 179,
-      "A2": 97,
-      "A6": 229,
-      "A1": 97,
-      "A4": 170
-    },
-    "planner": {
-      "retests_avoided": 1263,
-      "planned_moves": 3,
-      "mismatches": 9,
-      "planner_resets": 1,
-      "avatar_known_at": 6
-    }
-  },
-  {
-    "game": "ls20",
-    "level": 0,
-    "human": null,
-    "learn": 12,
-    "retest": 926,
-    "navigate": 28,
-    "waste": 34,
-    "total": 1000,
-    "retest_by_action": {
-      "A4": 265,
-      "A2": 609,
-      "A3": 46,
-      "A1": 6
-    },
-    "planner": {
-      "retests_avoided": 328,
-      "planned_moves": 9,
-      "mismatches": 25,
-      "planner_resets": 1,
-      "avatar_known_at": 259
     }
   },
   {
@@ -122,23 +54,47 @@
     "level": 0,
     "human": null,
     "learn": 15,
-    "retest": 910,
-    "navigate": 15,
-    "waste": 60,
+    "retest": 909,
+    "navigate": 17,
+    "waste": 59,
     "total": 1000,
     "retest_by_action": {
       "A2": 66,
-      "A5": 503,
-      "A1": 113,
-      "A4": 123,
-      "A3": 105
+      "A5": 488,
+      "A1": 18,
+      "A4": 177,
+      "A3": 160
     },
     "planner": {
-      "retests_avoided": 395,
-      "planned_moves": 4,
+      "retests_avoided": 461,
+      "planned_moves": 5,
       "mismatches": 3,
       "planner_resets": 1,
       "avatar_known_at": 124
+    }
+  },
+  {
+    "game": "ka59",
+    "level": 0,
+    "human": null,
+    "learn": 48,
+    "retest": 760,
+    "navigate": 34,
+    "waste": 158,
+    "total": 1000,
+    "retest_by_action": {
+      "A3": 162,
+      "A2": 73,
+      "A6": 278,
+      "A4": 179,
+      "A1": 68
+    },
+    "planner": {
+      "retests_avoided": 1270,
+      "planned_moves": 7,
+      "mismatches": 3,
+      "planner_resets": 1,
+      "avatar_known_at": 6
     }
   },
   {
@@ -146,23 +102,23 @@
     "level": 0,
     "human": null,
     "learn": 15,
-    "retest": 865,
-    "navigate": 17,
-    "waste": 103,
+    "retest": 812,
+    "navigate": 31,
+    "waste": 142,
     "total": 1000,
     "retest_by_action": {
-      "A4": 341,
-      "A2": 20,
-      "A3": 363,
-      "A1": 133,
-      "A5": 8
+      "A4": 375,
+      "A2": 48,
+      "A3": 349,
+      "A1": 33,
+      "A5": 7
     },
     "planner": {
-      "retests_avoided": 171,
-      "planned_moves": 7,
-      "mismatches": 9,
-      "planner_resets": 1,
-      "avatar_known_at": 15
+      "retests_avoided": 813,
+      "planned_moves": 0,
+      "mismatches": 0,
+      "planner_resets": 0,
+      "avatar_known_at": 40
     }
   },
   {
@@ -170,23 +126,47 @@
     "level": 0,
     "human": null,
     "learn": 15,
-    "retest": 334,
-    "navigate": 234,
-    "waste": 417,
+    "retest": 297,
+    "navigate": 161,
+    "waste": 527,
     "total": 1000,
     "retest_by_action": {
-      "A2": 66,
-      "A1": 27,
-      "A4": 37,
-      "A5": 180,
-      "A3": 24
+      "A2": 4,
+      "A1": 6,
+      "A4": 1,
+      "A5": 285,
+      "A3": 1
     },
     "planner": {
-      "retests_avoided": 1482,
-      "planned_moves": 3,
-      "mismatches": 25,
-      "planner_resets": 1,
+      "retests_avoided": 1947,
+      "planned_moves": 16,
+      "mismatches": 11,
+      "planner_resets": 0,
       "avatar_known_at": 8
+    }
+  },
+  {
+    "game": "m0r0",
+    "level": 0,
+    "human": null,
+    "learn": 33,
+    "retest": 609,
+    "navigate": 94,
+    "waste": 264,
+    "total": 1000,
+    "retest_by_action": {
+      "A3": 287,
+      "A4": 283,
+      "A1": 1,
+      "A5": 8,
+      "A6": 30
+    },
+    "planner": {
+      "retests_avoided": 1750,
+      "planned_moves": 0,
+      "mismatches": 0,
+      "planner_resets": 0,
+      "avatar_known_at": 15
     }
   },
   {
@@ -194,22 +174,163 @@
     "level": 1,
     "human": 19,
     "learn": 12,
-    "retest": 315,
-    "navigate": 154,
-    "waste": 10,
-    "total": 491,
+    "retest": 265,
+    "navigate": 81,
+    "waste": 27,
+    "total": 385,
     "retest_by_action": {
-      "A2": 106,
-      "A1": 102,
-      "A4": 56,
-      "A3": 51
+      "A2": 100,
+      "A1": 94,
+      "A4": 39,
+      "A3": 32
     },
     "planner": {
-      "retests_avoided": 3,
+      "retests_avoided": 12,
       "planned_moves": 0,
-      "mismatches": 9,
+      "mismatches": 3,
       "planner_resets": 1,
       "avatar_known_at": 111
+    }
+  },
+  {
+    "game": "lp85",
+    "level": 1,
+    "human": 17,
+    "learn": 16,
+    "retest": 4,
+    "navigate": 0,
+    "waste": 1,
+    "total": 21,
+    "retest_by_action": {
+      "A6": 4
+    },
+    "planner": {
+      "retests_avoided": 0,
+      "planned_moves": 0,
+      "mismatches": 0,
+      "planner_resets": 0,
+      "avatar_known_at": null
+    }
+  },
+  {
+    "game": "r11l",
+    "level": 1,
+    "human": 22,
+    "learn": 3,
+    "retest": 8,
+    "navigate": 0,
+    "waste": 0,
+    "total": 11,
+    "retest_by_action": {
+      "A6": 8
+    },
+    "planner": {
+      "retests_avoided": 0,
+      "planned_moves": 0,
+      "mismatches": 0,
+      "planner_resets": 0,
+      "avatar_known_at": null
+    }
+  },
+  {
+    "game": "s5i5",
+    "level": 0,
+    "human": null,
+    "learn": 37,
+    "retest": 844,
+    "navigate": 102,
+    "waste": 17,
+    "total": 1000,
+    "retest_by_action": {
+      "A6": 844
+    },
+    "planner": {
+      "retests_avoided": 0,
+      "planned_moves": 0,
+      "mismatches": 0,
+      "planner_resets": 0,
+      "avatar_known_at": null
+    }
+  },
+  {
+    "game": "su15",
+    "level": 1,
+    "human": 22,
+    "learn": 26,
+    "retest": 697,
+    "navigate": 74,
+    "waste": 26,
+    "total": 823,
+    "retest_by_action": {
+      "A6": 697
+    },
+    "planner": {
+      "retests_avoided": 0,
+      "planned_moves": 0,
+      "mismatches": 0,
+      "planner_resets": 0,
+      "avatar_known_at": null
+    }
+  },
+  {
+    "game": "vc33",
+    "level": 1,
+    "human": 7,
+    "learn": 27,
+    "retest": 207,
+    "navigate": 11,
+    "waste": 2,
+    "total": 247,
+    "retest_by_action": {
+      "A6": 207
+    },
+    "planner": {
+      "retests_avoided": 0,
+      "planned_moves": 0,
+      "mismatches": 0,
+      "planner_resets": 0,
+      "avatar_known_at": null
+    }
+  },
+  {
+    "game": "vc33",
+    "level": 2,
+    "human": 18,
+    "learn": 14,
+    "retest": 388,
+    "navigate": 66,
+    "waste": 9,
+    "total": 477,
+    "retest_by_action": {
+      "A6": 388
+    },
+    "planner": {
+      "retests_avoided": 0,
+      "planned_moves": 0,
+      "mismatches": 0,
+      "planner_resets": 0,
+      "avatar_known_at": null
+    }
+  },
+  {
+    "game": "sb26",
+    "level": 0,
+    "human": null,
+    "learn": 60,
+    "retest": 830,
+    "navigate": 105,
+    "waste": 5,
+    "total": 1000,
+    "retest_by_action": {
+      "A5": 312,
+      "A6": 518
+    },
+    "planner": {
+      "retests_avoided": 0,
+      "planned_moves": 0,
+      "mismatches": 0,
+      "planner_resets": 0,
+      "avatar_known_at": null
     }
   }
 ]

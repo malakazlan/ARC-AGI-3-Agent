@@ -46,22 +46,24 @@ class AvatarModel:
             diff &= ~mask
         if not diff.any():
             self.blocked_votes += 1
-            if self.signature is not None:
-                self.moves[self.signature][action][(0, 0)] += 1
+            for sig in list(self.moves):          # nothing moved: every known object stayed
+                self.moves[sig][action][(0, 0)] += 1
             return "blocked"
         self.moves_seen += 1
         groups = [g for g in find_translations(before, after, mask) if g.explained >= MIN_EXPLAINED]
         tracked = None
         if self.last_cells and self.template and _matches(before, self.template, self.last_cells):
             tracked = self.last_cells
+        moved_sigs = {sig for g in groups for sig in g.signatures}
         for g in groups:
             for sig in g.signatures:
                 self.moves[sig][action][(g.dy, g.dx)] += 1
+        for sig in list(self.moves):              # known objects that stayed put under this key
+            if sig not in moved_sigs:
+                self.moves[sig][action][(0, 0)] += 1
         self._elect()
         mine = self._my_group(groups, tracked)
         if mine is None:
-            if self.signature is not None:
-                self.moves[self.signature][action][(0, 0)] += 1
             if tracked is not None:
                 self.blocked_votes += 1
                 return "blocked"  # something else moved, not the avatar

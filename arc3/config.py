@@ -27,6 +27,9 @@ class Arc3Config:
     # re-testing them and plan paths to unknown terrain. Disabled per level after 3 mispredictions.
     planner: bool = True
     planner_max_mismatches: int = 3
+    # Learn click effects by object signature and non-move key effects by avatar appearance;
+    # skip actions whose effect is a known no-op or leads to a state already explored.
+    effects: bool = True
     # Optional local LLM layer. Off by default; must degrade to rules-only when missing.
     reasoner_enabled: bool = False
 

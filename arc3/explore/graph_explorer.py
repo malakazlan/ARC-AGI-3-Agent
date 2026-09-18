@@ -22,10 +22,12 @@ from arc3.perception import AttemptSignature, countdown_mask_from_signatures, se
 from arc3.plan import path_to_nearest_frontier, plan_moves
 from arc3.types import COMPLEX_ACTION_ID, ActionChoice, ActionKey, Observation
 from arc3.world_model import (
-    ActionPrior, AvatarModel, PassabilityModel, StateGraph, cells_ahead, click_class, predict_move,
+    ActionPrior, AvatarModel, ClickEffects, KeyEffects, PassabilityModel, StateGraph, cells_ahead,
+    click_class, object_signature, predict_move,
 )
 
 MOVE_KEYS = (1, 2, 3, 4)
+MISMATCH_RATE_LIMIT = 0.25  # disable planning for the level only when predictions are mostly wrong
 
 KEPT_ATTEMPTS = 10  # attempt signatures remembered per level (sparse, tiny)
 DRAINED_FRACTION = 0.9  # bar cells at their drained value => the death was an expiry
@@ -45,7 +47,7 @@ class GraphExplorer:
     def __init__(self, rng: random.Random, max_nodes: int = 5000, max_clicks: int = 64,
                  use_countdown_mask: bool = True, budget_aware: bool = True,
                  use_action_prior: bool = True, use_planner: bool = True,
-                 max_mismatches: int = 3) -> None:
+                 max_mismatches: int = 3, use_effects: bool = True) -> None:
         self.rng = rng
         self.max_nodes = max_nodes
         self.max_clicks = max_clicks
@@ -58,9 +60,16 @@ class GraphExplorer:
         self.max_mismatches = max_mismatches
         self.planning_enabled = use_planner
         self.mismatches = 0
+        self.predictions_checked = 0
         self.current_grid: np.ndarray | None = None
         self.expected: tuple[str, frozenset] | None = None  # prediction for the pending move
         self.move_plan: list[int] = []
+        # effects by signature: game-level facts, survive level changes
+        self.click_effects: ClickEffects | None = ClickEffects() if use_effects else None
+        self.key_effects: KeyEffects | None = KeyEffects() if use_effects else None
+        self.click_sig: dict[tuple[str, ActionKey], tuple] = {}  # (state key, click) -> object signature
+        self.floor: Counter = Counter()  # colours revealed where the avatar used to stand
+        self._last_signatures: dict[ActionKey, tuple] = {}
         self.graph = StateGraph(max_nodes)
         self.level_index = 0
         self.current_key: str | None = None
@@ -83,7 +92,7 @@ class GraphExplorer:
             "levels_seen": 0, "win_path_lengths": [], "budget_deaths": 0, "mask_cells": 0,
             "budget": None, "graph_rebuilds": 0, "deferred_picks": 0,
             "retests_avoided": 0, "mismatches": 0, "planner_resets": 0, "planned_moves": 0,
-            "avatar_known_at": None, "kill_colours": 0,
+            "avatar_known_at": None, "kill_colours": 0, "effects_avoided": 0,
         }
 
     # -- learning from what happened -------------------------------------------------------
@@ -103,6 +112,7 @@ class GraphExplorer:
             return
 
         self._learn_move(observation.grid)
+        self._learn_effect(observation.grid)
         self.current_grid = observation.grid
         if self.attempt.length == 0:
             self.attempt_actions = 0
@@ -124,6 +134,9 @@ class GraphExplorer:
             candidates, classes = self._candidates(observation)
             if not self.graph.add_node(key, candidates, classes):
                 self.diagnostics["capped"] += 1
+            else:
+                for action, sig in self._last_signatures.items():
+                    self.click_sig[(key, action)] = sig
         self.current_key = key
         self._sync_counters()
 
@@ -153,7 +166,10 @@ class GraphExplorer:
                 if actual == vec or _partial_stroke(actual, vec):
                     for (y, x) in new_cells - old_cells:
                         self.passability.vote(int(before[y, x]), "passes")
+                    for (y, x) in old_cells - new_cells:
+                        self.floor[int(grid[y, x])] += 1
                     if actual != vec:
+                        kind = "partial"  # a slide stopped early contradicts nothing
                         # slid until obstructed: the cells just beyond the reached position block
                         step = (int(np.sign(vec[0])), int(np.sign(vec[1])))
                         for (y, x) in self._in_bounds(cells_ahead(new_cells, step), before.shape):
@@ -163,10 +179,39 @@ class GraphExplorer:
             elif outcome == "blocked":
                 for (y, x) in self._in_bounds(cells_ahead(old_cells, vec), before.shape):
                     self.passability.vote(int(before[y, x]), "blocks")
-            if self.expected is not None and kind in ("moved", "blocked") and kind != self.expected[0]:
-                for (y, x) in self._in_bounds(cells_ahead(old_cells, vec), before.shape):
-                    self._on_mismatch(int(before[y, x]))
+            if self.expected is not None and kind in ("moved", "blocked", "partial"):
+                self.predictions_checked += 1
+                if kind != "partial" and kind != self.expected[0]:
+                    colours = {int(before[y, x]) for (y, x) in self._in_bounds(cells_ahead(old_cells, vec), before.shape)}
+                    self._on_mismatch_event(colours)
         self.expected = None
+
+    def _learn_effect(self, grid: np.ndarray) -> None:
+        """Record what a click or a non-move key did, by signature."""
+        if self.pending is None or self.last_grid is None or self.last_grid.shape != grid.shape:
+            return
+        src, action = self.pending
+        if action[0] == COMPLEX_ACTION_ID:
+            sig = self.click_sig.get((src, action))
+            if sig is not None and self.click_effects is not None:
+                self.click_effects.record(sig, (action[2], action[1]), self.last_grid, grid)
+        elif action[0] not in MOVE_KEYS and self.key_effects is not None:
+            self.key_effects.record(action[0], self._avatar_in(self.last_grid), self.last_grid, grid)
+
+    def _avatar_in(self, grid: np.ndarray) -> frozenset:
+        if self.avatar is None or not self.avatar.confident:
+            return frozenset()
+        return self.avatar.avatar_cells(grid)
+
+    def _effect_predictable(self, key: str, action: ActionKey) -> bool:
+        """True when the action's effect is known and executing it would teach nothing: a no-op,
+        or a transition into a state already in the graph."""
+        predicted = self._predicted_effect_grid(key, action)
+        if predicted is None:
+            return False
+        if np.array_equal(predicted, self.current_grid):
+            return True
+        return state_hash(predicted, self.mask) in self.graph
 
     def _learn_death(self) -> None:
         """A non-expiry death right after a key press: the colours ahead kill."""
@@ -183,10 +228,17 @@ class GraphExplorer:
         self.expected = None
 
     def _on_mismatch(self, colour: int) -> None:
-        self.passability.contradict(colour)
+        self._on_mismatch_event({int(colour)})
+
+    def _on_mismatch_event(self, colours: set[int]) -> None:
+        """One misprediction = one event, however many cells were ahead."""
+        for colour in colours:
+            self.passability.contradict(colour)
         self.mismatches += 1
         self.diagnostics["mismatches"] += 1
-        if self.mismatches >= self.max_mismatches and self.planning_enabled:
+        rate = self.mismatches / max(1, self.predictions_checked)
+        if (self.mismatches >= self.max_mismatches and rate >= MISMATCH_RATE_LIMIT
+                and self.planning_enabled):
             self.planning_enabled = False
             self.diagnostics["planner_resets"] += 1
         self.move_plan = []
@@ -207,6 +259,61 @@ class GraphExplorer:
         if self.avatar is None:
             return {}
         return {k: v for k in MOVE_KEYS if (v := self.avatar.vector(k)) is not None}
+
+    def _predicted_move_grid(self, key: int) -> np.ndarray | None:
+        """Render the frame after a predictable move: avatar shifted, vacated cells = floor."""
+        pred = self._prediction(key)
+        if pred is None or self.current_grid is None:
+            return None
+        if pred[0] == "blocked":
+            return self.current_grid
+        cells = self.avatar.avatar_cells(self.current_grid)  # type: ignore[union-attr]
+        out = self.current_grid.copy()
+        floor = self.floor.most_common(1)[0][0] if self.floor else None
+        if floor is None:
+            return None
+        for (y, x) in cells:
+            out[y, x] = floor
+        # shift by the key vector, keeping each cell's own colour
+        vec = self.avatar.vector(key)  # type: ignore[union-attr]
+        for (y, x) in cells:
+            ny, nx = y + vec[0], x + vec[1]
+            if 0 <= ny < out.shape[0] and 0 <= nx < out.shape[1]:
+                out[ny, nx] = self.current_grid[y, x]
+        return out
+
+    def _predicted_effect_grid(self, key: str, action: ActionKey) -> np.ndarray | None:
+        if self.current_grid is None:
+            return None
+        if action[0] == COMPLEX_ACTION_ID and self.click_effects is not None:
+            sig = self.click_sig.get((key, action))
+            if sig is None:
+                return None
+            return self.click_effects.predict(sig, (action[2], action[1]), self.current_grid)
+        if action[0] not in MOVE_KEYS and self.key_effects is not None:
+            return self.key_effects.predict(action[0], self._avatar_in(self.current_grid), self.current_grid)
+        return None
+
+    def _record_predicted_edges(self, key: str) -> None:
+        """Turn every predictable untested action at the current state into a predicted edge, so the
+        graph keeps its connectivity without executing the action. Executing later overwrites it."""
+        if key != self.current_key or key not in self.graph or self.current_grid is None:
+            return
+        for action in self.graph.untested(key):
+            grid = None
+            if action[0] in MOVE_KEYS:
+                if self._planner_ready():
+                    grid = self._predicted_move_grid(action[0])
+            else:
+                grid = self._predicted_effect_grid(key, action)
+            if grid is None:
+                continue
+            if np.array_equal(grid, self.current_grid):
+                self.graph.record(key, action, key, changed=False, game_over=False, level_up=False, predicted=True)
+                continue
+            dst = state_hash(grid, self.mask)
+            if dst in self.graph:
+                self.graph.record(key, action, dst, changed=True, game_over=False, level_up=False, predicted=True)
 
     def _prediction(self, key: int) -> tuple[str, frozenset] | None:
         if not self._planner_ready():
@@ -314,6 +421,7 @@ class GraphExplorer:
             return self._random_legal(observation), "graph: state not stored"
         live = self._live_untested(key, count=True)
         self._live_now = live
+        self._record_predicted_edges(key)
         if live:
             self.plan = []
             return self._best(key, live), f"graph: untested ({len(live)} live here)"
@@ -375,6 +483,15 @@ class GraphExplorer:
                         continue
                 kept.append(a)
             untested = kept
+        if key == self.current_key and (self.click_effects is not None or self.key_effects is not None):
+            kept = []
+            for a in untested:
+                if a[0] not in MOVE_KEYS and self._effect_predictable(key, a):
+                    if count:
+                        self.diagnostics["effects_avoided"] += 1
+                    continue
+                kept.append(a)
+            untested = kept
         return untested
 
     def _has_live_untested(self, key: str) -> bool:
@@ -406,6 +523,7 @@ class GraphExplorer:
         legal = observation.available_actions
         keys: list[ActionKey] = [(a, None, None) for a in legal if a != COMPLEX_ACTION_ID]
         classes: dict[ActionKey, tuple] = {k: (k[0],) for k in keys}
+        self._last_signatures = {}
         if COMPLEX_ACTION_ID in legal and observation.grid is not None:
             objects = segment_objects(observation.grid)
             objects.sort(key=lambda o: (o.size, o.bbox))  # small things first: buttons
@@ -414,6 +532,7 @@ class GraphExplorer:
                 key = (COMPLEX_ACTION_ID, int(x), int(y))
                 keys.append(key)
                 classes[key] = click_class(obj.color, obj.size)
+                self._last_signatures[key] = object_signature(obj)
             if not objects:
                 h, w = observation.grid.shape
                 key = (COMPLEX_ACTION_ID, w // 2, h // 2)
@@ -447,6 +566,7 @@ class GraphExplorer:
         self.diagnostics["mask_cells"] = 0
         self.diagnostics["budget"] = None
         self.mismatches = 0
+        self.predictions_checked = 0
         if self.avatar is not None:
             self.planning_enabled = True
         self._forget_position()

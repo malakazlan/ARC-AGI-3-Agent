@@ -116,6 +116,7 @@ class Orchestrator:
                 use_action_prior=config.action_prior,
                 use_planner=config.planner,
                 max_mismatches=config.planner_max_mismatches,
+                use_effects=config.effects,
             )
         return self._random_policy
 

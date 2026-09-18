@@ -202,3 +202,87 @@ def test_action_prior_can_be_disabled():
     game = ToyGame(levels=1, available=[1, 2, 3, 4, 5], extra_cells={(6, 6): 7})
     brain, _ = run(game, steps=100, action_prior=False)
     assert brain.policy.prior is None
+
+
+# --- effects by signature: predictable actions are not executed ------------------------
+
+def _explorer_seeing(grid, available):
+    """An explorer that has observed one state with the given grid (no engine)."""
+    import random
+    from arc3.explore import GraphExplorer
+    from arc3.types import Observation
+
+    ex = GraphExplorer(random.Random(0), use_action_prior=False)
+    ex.observe(Observation("NOT_FINISHED", 0, 1, grid, list(available)))
+    return ex
+
+
+def test_click_with_a_global_no_op_effect_is_skipped_and_recorded_as_a_predicted_self_loop():
+    import numpy as np
+
+    g = np.zeros((8, 8), dtype=np.int8)
+    g[3, 0:6] = 2                                   # a wall
+    g[6, 6] = 5                                     # a button
+    ex = _explorer_seeing(g, [6])
+    key = ex.current_key
+    wall = next(a for a in ex.graph.untested(key) if g[a[2], a[1]] == 2)
+    sig = ex.click_sig[(key, wall)]
+    for _ in range(3):
+        ex.click_effects.record(sig, (wall[2], wall[1]), g, g)     # three consistent no-ops elsewhere
+    live = ex._live_untested(key, count=True)
+    assert wall not in live
+    assert ex.diagnostics["effects_avoided"] == 1
+    ex._record_predicted_edges(key)
+    edge = ex.graph.edge(key, wall)
+    assert edge is not None and edge.predicted and edge.dst_key == key
+
+
+def test_click_whose_predicted_state_is_unknown_is_still_executed():
+    import numpy as np
+
+    g = np.zeros((8, 8), dtype=np.int8)
+    g[6, 6] = 5
+    ex = _explorer_seeing(g, [6])
+    key = ex.current_key
+    button = next(a for a in ex.graph.untested(key) if g[a[2], a[1]] == 5)
+    sig = ex.click_sig[(key, button)]
+    after = g.copy(); after[6, 6] = 0
+    for _ in range(3):
+        ex.click_effects.record(sig, (6, 6), g, after)          # removal is global now
+    assert button in ex._live_untested(key, count=True)         # but the removed state is new
+    assert ex.diagnostics["effects_avoided"] == 0
+
+
+def test_click_into_an_already_known_state_becomes_a_predicted_edge():
+    import numpy as np
+    from arc3.types import Observation
+
+    g = np.zeros((8, 8), dtype=np.int8)
+    g[6, 6] = 5
+    ex = _explorer_seeing(g, [6])
+    key = ex.current_key
+    button = next(a for a in ex.graph.untested(key) if g[a[2], a[1]] == 5)
+    sig = ex.click_sig[(key, button)]
+    after = g.copy(); after[6, 6] = 0
+    for _ in range(3):
+        ex.click_effects.record(sig, (6, 6), g, after)
+    ex.observe(Observation("NOT_FINISHED", 0, 1, after, [6]))   # the removed state is known now
+    ex.observe(Observation("NOT_FINISHED", 0, 1, g, [6]))       # back at the start state
+    assert button not in ex._live_untested(key, count=True)
+    ex._record_predicted_edges(key)
+    edge = ex.graph.edge(key, button)
+    assert edge is not None and edge.predicted and edge.dst_key != key
+
+
+def test_no_op_key_effect_is_skipped_by_avatar_appearance():
+    import numpy as np
+
+    g = np.zeros((8, 8), dtype=np.int8)
+    g[4, 4] = 1
+    ex = _explorer_seeing(g, [1, 2, 3, 4, 7])
+    key = ex.current_key
+    for _ in range(3):
+        ex.key_effects.record(7, frozenset(), g, g)
+    live = ex._live_untested(key, count=True)
+    assert (7, None, None) not in live
+    assert ex.diagnostics["effects_avoided"] == 1

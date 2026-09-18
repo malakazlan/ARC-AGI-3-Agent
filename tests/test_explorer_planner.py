@@ -53,11 +53,23 @@ def test_mismatch_disables_planning_for_the_level_and_is_logged():
     game = ToyGame(levels=1)
     brain, _ = run(game, steps=60)
     ex = brain.policy
+    ex.predictions_checked = 4                     # 3 of 4 predictions wrong: mostly wrong
     for _ in range(3):
         ex._on_mismatch(colour=0)
     assert ex.planning_enabled is False
     assert ex.diagnostics["planner_resets"] == 1
     assert ex.diagnostics["mismatches"] == 3
+
+
+def test_rare_mismatches_do_not_disable_planning():
+    game = ToyGame(levels=1)
+    brain, _ = run(game, steps=60)
+    ex = brain.policy
+    ex.predictions_checked = 200                   # 3 of 200 wrong: keep planning
+    for _ in range(3):
+        ex._on_mismatch(colour=0)
+    assert ex.planning_enabled is True
+    assert ex.diagnostics["planner_resets"] == 0
 
 
 def test_planner_can_be_disabled_by_config():
