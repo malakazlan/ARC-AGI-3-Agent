@@ -64,3 +64,57 @@ def test_planner_can_be_disabled_by_config():
     game = ToyGame(levels=1)
     brain, _ = run(game, steps=30, planner=False)
     assert brain.policy.avatar is None
+
+
+def _explorer_with_known_avatar():
+    """An explorer whose avatar model already knows key 4 = (0, 2) and a 1x1 avatar of colour 1."""
+    import numpy as np
+    from arc3.explore import GraphExplorer
+    import random
+
+    ex = GraphExplorer(random.Random(0))
+    g0 = np.zeros((8, 8), dtype=np.int8); g0[4, 0] = 1
+    g1 = np.zeros((8, 8), dtype=np.int8); g1[4, 2] = 1
+    g2 = np.zeros((8, 8), dtype=np.int8); g2[4, 4] = 1
+    g3 = np.zeros((8, 8), dtype=np.int8); g3[4, 6] = 1
+    up = np.zeros((8, 8), dtype=np.int8); up[2, 6] = 1
+    for a, b in ((g0, g1), (g1, g2), (g2, g3)):
+        ex.avatar.observe(a, 4, b)
+    ex.avatar.observe(g3, 1, up)          # a second key: control is established
+    ex.avatar.observe(up, 2, g3)
+    ex.avatar.observe(g3, 1, up)
+    ex.avatar.observe(up, 2, g3)
+    for _ in range(3):
+        ex.passability.vote(0, "passes")
+    return ex, g3
+
+
+def test_partial_move_toward_a_wall_is_not_a_mismatch_and_teaches_passability():
+    import numpy as np
+
+    ex, before = _explorer_with_known_avatar()
+    before = before.copy(); before[4, 7] = 0            # avatar at (4,6); full stroke would be (4,8): off grid
+    before[4, 6] = 1
+    ex.last_grid = before
+    ex.pending = ("k", (4, None, None))
+    ex.expected = ("blocked", frozenset({(4, 6)}))      # off-grid ahead -> predicted blocked
+    after = np.zeros((8, 8), dtype=np.int8); after[4, 7] = 1   # it slid one cell instead
+    ex._learn_move(after)
+    assert ex.diagnostics["mismatches"] == 0
+    assert ex.avatar.last_cells == {(4, 7)}
+
+
+def test_partial_move_votes_blocks_for_the_cells_beyond():
+    import numpy as np
+
+    ex, before = _explorer_with_known_avatar()
+    before = np.zeros((8, 8), dtype=np.int8); before[4, 2] = 1; before[4, 4] = 5   # wall of colour 5 two cells ahead
+    ex.avatar.last_cells = frozenset({(4, 2)}); ex.avatar.template = {(0, 0): 1}
+    ex.last_grid = before
+    ex.pending = ("k", (4, None, None))
+    ex.expected = ("moved", frozenset({(4, 4)}))
+    after = np.zeros((8, 8), dtype=np.int8); after[4, 3] = 1; after[4, 4] = 5    # slid one cell
+    ex._learn_move(after)
+    assert ex.diagnostics["mismatches"] == 0
+    assert ex.passability.votes[5].blocks == 1
+    assert ex.passability.votes[0].passes >= 4

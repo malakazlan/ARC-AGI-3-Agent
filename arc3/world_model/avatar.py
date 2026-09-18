@@ -1,9 +1,11 @@
 """Which object do the keys move, and where does each key move it?
 
-Learned once per game from the first explained moves: after every key action that changed the
-frame, the translation test yields a displacement and the cells that moved. The avatar is the
-template (relative colour pattern) of those cells; each key's vector is the dominant
-displacement once it has enough votes. Contradictory evidence leaves a key unknown.
+Learned once per game. After every key press that changed the frame, the object-level
+translation test yields the groups of objects that moved and by how much. An object is
+controllable when its displacement depends on the key: different keys, different vectors
+(staying put counts as the zero vector). An object that moves the same way whatever we press
+is autonomous and is never the avatar. Each key's vector is the dominant displacement of the
+avatar under that key once it has enough votes.
 """
 from __future__ import annotations
 
@@ -11,22 +13,25 @@ from collections import Counter, defaultdict
 
 import numpy as np
 
-from arc3.perception import find_translation
+from arc3.perception import find_translations
 
 MIN_VOTES = 3
 MIN_SHARE = 0.6
-MIN_EXPLAINED = 0.8
-MIN_OVERLAP = 0.5  # a partial-appearance move must overlap the tracked avatar this much
+MIN_EXPLAINED = 0.0  # every moved group counts: a small avatar next to a big drifter is normal (sp80)
+MIN_OVERLAP = 0.5    # a partial-appearance move must overlap the tracked avatar this much
 
 Cells = frozenset[tuple[int, int]]
+Signature = tuple
 
 
 class AvatarModel:
     def __init__(self) -> None:
-        self.votes: dict[int, Counter] = defaultdict(Counter)
-        self.last_vector: dict[int, tuple[int, int]] = {}  # latest explained displacement per key
+        # signature -> key -> Counter of displacements (including (0, 0) for "did not move")
+        self.moves: dict[Signature, dict[int, Counter]] = defaultdict(lambda: defaultdict(Counter))
+        self.signature: Signature | None = None  # the avatar's object signature
+        self.last_vector: dict[int, tuple[int, int]] = {}
         self.blocked_votes = 0
-        self.template: dict[tuple[int, int], int] | None = None  # relative (dy, dx) -> colour
+        self.template: dict[tuple[int, int], int] | None = None
         self.last_cells: Cells | None = None
         self.moves_seen = 0
         self.moves_explained = 0
@@ -41,55 +46,95 @@ class AvatarModel:
             diff &= ~mask
         if not diff.any():
             self.blocked_votes += 1
+            if self.signature is not None:
+                self.moves[self.signature][action][(0, 0)] += 1
             return "blocked"
         self.moves_seen += 1
-        tr = find_translation(before, after, mask)
+        groups = [g for g in find_translations(before, after, mask) if g.explained >= MIN_EXPLAINED]
         tracked = None
         if self.last_cells and self.template and _matches(before, self.template, self.last_cells):
             tracked = self.last_cells
-        if tr is None:
+        for g in groups:
+            for sig in g.signatures:
+                self.moves[sig][action][(g.dy, g.dx)] += 1
+        self._elect()
+        mine = self._my_group(groups, tracked)
+        if mine is None:
+            if self.signature is not None:
+                self.moves[self.signature][action][(0, 0)] += 1
             if tracked is not None:
-                self.blocked_votes += 1
-                return "blocked"  # the avatar stayed; something else changed
-            return "unexplained"
-        moved = set(tr.cells)
-        overlap = len(moved & tracked) / len(tracked) if tracked else 0.0
-        if tr.explained < MIN_EXPLAINED and overlap < MIN_OVERLAP:
-            if tracked is not None and not (moved & tracked):
                 self.blocked_votes += 1
                 return "blocked"  # something else moved, not the avatar
             return "unexplained"
         self.moves_explained += 1
-        self.votes[action][(tr.dy, tr.dx)] += 1
-        self.last_vector[action] = (tr.dy, tr.dx)
-        source = tracked if (tracked is not None and overlap >= MIN_OVERLAP) else frozenset(tr.cells)
+        self.last_vector[action] = (mine.dy, mine.dx)
+        moved = set(mine.cells)
+        overlap = len(moved & tracked) / len(tracked) if tracked else 0.0
+        source = tracked if (tracked is not None and overlap >= MIN_OVERLAP) else frozenset(mine.cells)
         h, w = after.shape
-        shifted = frozenset((y + tr.dy, x + tr.dx) for (y, x) in source)
+        shifted = frozenset((y + mine.dy, x + mine.dx) for (y, x) in source)
         if any(not (0 <= y < h and 0 <= x < w) for (y, x) in shifted):
-            shifted = frozenset((y + tr.dy, x + tr.dx) for (y, x) in tr.cells)  # moved cells are in-bounds
+            shifted = frozenset((y + mine.dy, x + mine.dx) for (y, x) in mine.cells)
         self.last_cells = shifted
         self.template = _template(after, self.last_cells)
         return "moved"
 
+    def _elect(self) -> None:
+        """Pick the avatar: the controllable signature with the most evidence."""
+        best = None
+        for sig in self.controllable:
+            votes = sum(sum(c.values()) for c in self.moves[sig].values())
+            if best is None or votes > best[0]:
+                best = (votes, sig)
+        self.signature = best[1] if best else None
+
+    def _my_group(self, groups, tracked):
+        if self.signature is None:
+            return None
+        for g in groups:
+            if self.signature in g.signatures:
+                return g
+        if tracked is not None:  # appearance changed: follow by overlap instead
+            for g in groups:
+                if len(set(g.cells) & tracked) / len(tracked) >= MIN_OVERLAP:
+                    return g
+        return None
+
     # -- what we know -----------------------------------------------------------------------
 
+    @property
+    def controllable(self) -> list[Signature]:
+        """Signatures whose dominant displacement differs between at least two keys."""
+        out = []
+        for sig, per_key in self.moves.items():
+            dominant = {k: c.most_common(1)[0][0] for k, c in per_key.items() if c}
+            if len(set(dominant.values())) >= 2:
+                out.append(sig)
+        return out
+
     def vector(self, action: int) -> tuple[int, int] | None:
-        votes = self.votes.get(action)
+        if self.signature is None:
+            return None
+        votes = self.moves[self.signature].get(action)
         if not votes:
             return None
-        (vec, count), = votes.most_common(1)
-        total = sum(votes.values())
+        moving = Counter({d: n for d, n in votes.items() if d != (0, 0)})  # bumps are passability
+        if not moving:
+            return None
+        (vec, count), = moving.most_common(1)
+        total = sum(moving.values())
         if count >= MIN_VOTES and count / total >= MIN_SHARE:
             return vec
         return None
 
     @property
     def confident(self) -> bool:
-        return self.template is not None and any(self.vector(a) is not None for a in self.votes)
+        return (self.signature is not None and self.template is not None
+                and any(self.vector(a) is not None for a in self.moves[self.signature]))
 
     def avatar_cells(self, grid: np.ndarray) -> Cells:
-        """Cells occupied by the avatar in `grid`, by matching its template (nearest to the last
-        known position first). Empty when the template is unknown or not found."""
+        """Cells occupied by the avatar in `grid`: the tracked cells if the template still
+        matches there, else the nearest template match. Empty when unknown or not found."""
         if self.template is None:
             return frozenset()
         if self.last_cells and _matches(grid, self.template, self.last_cells):

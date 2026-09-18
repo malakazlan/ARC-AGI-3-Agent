@@ -99,6 +99,12 @@ def account(game_id: str, seed: int, max_actions: int, baselines: dict[str, list
                                      ("retests_avoided", "planned_moves", "mismatches", "planner_resets", "avatar_known_at")}})
             per_level = Counter()
             level = obs.levels_completed
+    if not rows:
+        rows.append({"game": game_id, "level": 0, "human": None, **{c: per_level[c] for c in CATEGORIES},
+                     "total": sum(v for k, v in per_level.items() if not k.startswith("retest_")),
+                     "retest_by_action": {k[7:]: v for k, v in per_level.items() if k.startswith("retest_")},
+                     "planner": {k: explorer.diagnostics.get(k) for k in
+                                 ("retests_avoided", "planned_moves", "mismatches", "planner_resets", "avatar_known_at")}})
     return rows
 
 

@@ -31,6 +31,16 @@ KEPT_ATTEMPTS = 10  # attempt signatures remembered per level (sparse, tiny)
 DRAINED_FRACTION = 0.9  # bar cells at their drained value => the death was an expiry
 
 
+def _partial_stroke(actual: tuple[int, int] | None, vec: tuple[int, int]) -> bool:
+    """True when `actual` is a shorter move in the same direction as `vec` (a slide stopped early)."""
+    if actual is None:
+        return False
+    same_axis = all((a == 0) == (v == 0) for a, v in zip(actual, vec))
+    same_sign = all(a * v >= 0 for a, v in zip(actual, vec))
+    shorter = abs(actual[0]) + abs(actual[1]) < abs(vec[0]) + abs(vec[1])
+    return same_axis and same_sign and shorter
+
+
 class GraphExplorer:
     def __init__(self, rng: random.Random, max_nodes: int = 5000, max_clicks: int = 64,
                  use_countdown_mask: bool = True, budget_aware: bool = True,
@@ -136,13 +146,24 @@ class GraphExplorer:
             self.diagnostics["avatar_known_at"] = self.trace and len(self.trace)
         vec = self.avatar.vector(key)
         if old_cells and vec is not None and self.mask_ok(before):
-            if outcome == "moved" and self.avatar.last_vector.get(key) == vec:
-                for (y, x) in self.avatar.last_cells - old_cells:
-                    self.passability.vote(int(before[y, x]), "passes")
+            kind = outcome
+            if outcome == "moved":
+                actual = self.avatar.last_vector.get(key)
+                new_cells = self.avatar.last_cells
+                if actual == vec or _partial_stroke(actual, vec):
+                    for (y, x) in new_cells - old_cells:
+                        self.passability.vote(int(before[y, x]), "passes")
+                    if actual != vec:
+                        # slid until obstructed: the cells just beyond the reached position block
+                        step = (int(np.sign(vec[0])), int(np.sign(vec[1])))
+                        for (y, x) in self._in_bounds(cells_ahead(new_cells, step), before.shape):
+                            self.passability.vote(int(before[y, x]), "blocks")
+                else:
+                    kind = "other"  # moved in an unexpected direction: no votes
             elif outcome == "blocked":
                 for (y, x) in self._in_bounds(cells_ahead(old_cells, vec), before.shape):
                     self.passability.vote(int(before[y, x]), "blocks")
-            if self.expected is not None and outcome in ("moved", "blocked") and outcome != self.expected[0]:
+            if self.expected is not None and kind in ("moved", "blocked") and kind != self.expected[0]:
                 for (y, x) in self._in_bounds(cells_ahead(old_cells, vec), before.shape):
                     self._on_mismatch(int(before[y, x]))
         self.expected = None

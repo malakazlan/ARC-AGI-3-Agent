@@ -98,7 +98,7 @@ def test_avatar_and_key_vectors_are_learned_after_three_votes():
 
 
 def test_no_op_moves_do_not_vote_and_do_not_break_the_model():
-    frames, actions = sequence([(4, 0, 1), (4, 0, 1), (4, 0, 1)])
+    frames, actions = sequence([(4, 0, 1), (2, 1, 0), (4, 0, 1), (2, 1, 0), (4, 0, 1), (2, 1, 0)])
     model = AvatarModel()
     for k, action in enumerate(actions):
         model.observe(frames[k], action, frames[k + 1])
@@ -117,7 +117,7 @@ def test_contradicting_vectors_leave_the_key_unknown():
 
 
 def test_predicted_position_after_a_known_move():
-    frames, actions = sequence([(4, 0, 1)] * 3)
+    frames, actions = sequence([(4, 0, 1), (4, 0, 1), (2, 1, 0), (4, 0, 1), (2, 1, 0), (2, 1, 0)])
     model = AvatarModel()
     for k, action in enumerate(actions):
         model.observe(frames[k], action, frames[k + 1])
@@ -163,9 +163,14 @@ def test_avatar_that_changes_appearance_is_still_tracked_by_continuity():
     frames = []
     for k in range(4):
         g = grid8(); ring(g, 2, k, 2); frames.append(g)
+    down = grid8(); ring(down, 3, 3, 2)
     model = AvatarModel()
     for k in range(3):
         model.observe(frames[k], 4, frames[k + 1])
+    model.observe(frames[3], 2, down)             # a second key, so control is established
+    model.observe(down, 1, frames[3])
+    model.observe(frames[3], 2, down)
+    model.observe(down, 1, frames[3])
     before = frames[-1]
     cells = model.avatar_cells(before)
     assert len(cells) == 9
@@ -176,7 +181,7 @@ def test_avatar_that_changes_appearance_is_still_tracked_by_continuity():
 
 
 def test_blocked_move_keeps_the_avatar_where_it_was_even_if_the_frame_changed_elsewhere():
-    frames, actions = sequence([(4, 0, 1)] * 3)
+    frames, actions = sequence([(4, 0, 1), (2, 1, 0), (4, 0, 1), (2, 1, 0), (4, 0, 1), (2, 1, 0)])
     model = AvatarModel()
     for k, action in enumerate(actions):
         model.observe(frames[k], action, frames[k + 1])
@@ -187,3 +192,33 @@ def test_blocked_move_keeps_the_avatar_where_it_was_even_if_the_frame_changed_el
     outcome = model.observe(before, 4, after)
     assert outcome == "blocked"
     assert model.avatar_cells(after) == cells
+
+
+def test_object_that_drifts_regardless_of_the_key_is_not_the_avatar():
+    """A bar slides down every step whatever we press; a small blob obeys keys 3 and 4."""
+    frames, actions = [], []
+    bar_y, x = 0, 3
+    for k, (action, dx) in enumerate([(4, 1), (3, -1), (4, 1), (3, -1), (4, 1), (3, -1), (4, 1)]):
+        g = grid8()
+        g[bar_y, 0:8] = 7             # the drifting bar (moves before we act)
+        g[6, x] = 1                   # the controllable blob
+        frames.append(g)
+        if k < 6:
+            actions.append(action)
+        bar_y = (bar_y + 1) % 6
+        x += dx
+    model = AvatarModel()
+    for k, action in enumerate(actions):
+        model.observe(frames[k], action, frames[k + 1])
+    assert model.vector(4) == (0, 1)
+    assert model.vector(3) == (0, -1)
+    assert len(model.avatar_cells(frames[-1])) == 1
+    assert (7,) not in {tuple(sig[:1]) for sig in model.controllable}
+
+
+def test_one_key_alone_cannot_establish_control():
+    frames, actions = sequence([(4, 0, 1)] * 3)
+    model = AvatarModel()
+    for k, action in enumerate(actions):
+        model.observe(frames[k], action, frames[k + 1])
+    assert not model.confident
