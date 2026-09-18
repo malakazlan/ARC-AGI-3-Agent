@@ -62,3 +62,13 @@ Implementation details belong in DECISIONS.md, not here. Mark unverified beliefs
   object" at all. (2) A commit action that both wins and kills (sp80 ACTION5, 19% kill rate)
   cannot be judged by class; whether it kills depends on where things are. That is a
   state-conditional effect, i.e. a small predictive model over object relations, not a prior.
+- 2026-09-18 (`eval/action_accounting.py` on 11 won levels) — Learning a level's mechanics
+  costs about 18 actions, human scale; 77% of our actions re-test a known action class in a
+  new state. The gap to humans is not perception or discovery, it is that we do not carry what
+  we learned from one state to the next. Anything that predicts a transition instead of
+  executing it attacks the biggest term directly.
+- 2026-09-18 (avatar and win probes on traces) — In 9 of 11 keyboard games one multi-colour
+  blob moves by a consistent vector per key (once the energy bar is excluded from the diff);
+  the key-to-direction map is game-specific (m0r0, sc25). Winning clicks target one colour per
+  game and vc33 uses the same colour on levels 1 and 2. Agentness and a carried goal are
+  cheap to detect and are exactly what the tutorial level is designed to teach.
