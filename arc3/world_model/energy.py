@@ -68,4 +68,9 @@ class EnergyModel:
         return self.remaining(grid) / max(self.rate, 1e-6)
 
     def affordable(self, actions: int, grid: np.ndarray, margin: int = 1) -> bool:
-        return (actions + margin) * self.rate <= self.remaining(grid)
+        """Can the bar pay for this many actions and still have a margin? When a cell stands
+        for several actions (rate below one) the last cell may be almost spent, so it does not
+        count."""
+        remaining = self.remaining(grid)
+        usable = remaining - 1 if (self.rate < 1.0 and remaining < self.capacity) else remaining
+        return (actions + margin) * self.rate <= usable

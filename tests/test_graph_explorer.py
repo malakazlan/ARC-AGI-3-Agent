@@ -159,7 +159,7 @@ def test_expiry_is_read_from_the_bar_not_the_clock():
 
 def test_death_with_energy_left_is_still_a_lethal_edge():
     game = ToyGame(levels=1, budget=40, extra_cells={(1, 2): 3})   # trap next to the start
-    brain, _ = run(game, steps=120)
+    brain, _ = run(game, steps=120, dial_cap=True, breadth_first=True)
     explorer = brain.policy
     assert explorer.diagnostics["game_overs"] >= 1
     assert explorer.diagnostics["game_over_retries"] == 0
@@ -296,7 +296,7 @@ def test_dial_key_is_pressed_at_most_a_few_cycles_not_once_per_state():
     """ACTION7 cycles a lamp through 3 colours. Once the cycle is known, the explorer stops
     pressing it in every new position."""
     game = ToyGame(levels=1, available=[1, 2, 3, 4, 7], extra_cells={(6, 6): 0}, dial_cell=(0, 7))
-    brain, log = run(game, steps=300)
+    brain, log = run(game, steps=300, dial_cap=True, breadth_first=True)
     ex = brain.policy
     assert ex.dials.period((7,)) == 3
     sevens = sum(1 for _, c in log if c.action_id == 7)
@@ -309,6 +309,6 @@ def test_dial_key_is_pressed_at_most_a_few_cycles_not_once_per_state():
 def test_each_key_is_tried_once_before_any_key_is_repeated():
     """The first presses must be four different keys, even when the first one succeeded."""
     game = ToyGame(levels=1)
-    brain, log = run(game, steps=8)
+    brain, log = run(game, steps=8, dial_cap=True, breadth_first=True)
     keys = [c.action_id for _, c in log if c.action_id in (1, 2, 3, 4)][:4]
     assert sorted(keys) == [1, 2, 3, 4]

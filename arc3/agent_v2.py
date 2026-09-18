@@ -20,7 +20,7 @@ from arc3.config import Arc3Config
 from arc3.explore import GraphExplorer
 from arc3.perception import GridObject, segment_objects, shape_key
 from arc3.plan import plan_moves
-from arc3.rules import Goal, RuleStore, display_pairs, extract_events, match_progress
+from arc3.rules import Goal, RuleStore, display_pairs, extract_events, match_progress, match_report
 from arc3.types import ActionChoice, ActionKey, Observation
 from arc3.world_model import cells_ahead
 
@@ -61,8 +61,10 @@ class RulePolicy:
         self.display_exit_tried = False
         self.touches = 0
         self.last_progress = 0.0
+        self.last_report: dict[str, bool] = {"colour": False, "shape": False}
         self.energy_before: int | None = None         # bar reading when we pressed into a tool
         self.ambient_rises = 0                       # bar rises seen while the avatar stood still
+        self.refilling = False                       # committed to a refill detour until it lands
         self._last_key: int | None = None
         self.prev_changed: frozenset = frozenset()   # cells that changed on the previous action
         self.goal_needs_anchor = False
@@ -89,6 +91,7 @@ class RulePolicy:
             self.plan = []
             self.touches = 0
             self.last_progress = 0.0
+            self.refilling = False
             self._reset_exit()
             self.last_grid = observation.grid
             self.prev_changed = frozenset()
@@ -101,6 +104,10 @@ class RulePolicy:
             moved = avatar is not None and avatar.confident and avatar.last_vector.get(self._last_key) not in (None, (0, 0))
             if not moved:
                 self.ambient_rises += 1   # the bar rose while we stood still: it rises by itself
+        if (energy is not None and observation.grid is not None and self.last_grid is not None
+                and self.last_grid.shape == observation.grid.shape
+                and energy.remaining(observation.grid) > energy.remaining(self.last_grid)):
+            self.refilling = False
         if observation.grid is not None and self.last_grid is not None and self.pending_touch is not None:
             self._read_touch(self.last_grid, observation.grid)
         self.pending_touch = None
@@ -230,8 +237,20 @@ class RulePolicy:
             if self.touches >= TOUCH_LIMIT:
                 self._demote()
                 return None
-            tool = self._find_tool(grid, tool_sig)
+            # the dial for a property that still mismatches; none known: probe something new
+            wanted = [p for p, ok in self.last_report.items() if not ok]
+            tool = None
+            for sig, t in self.store.tools.items():
+                if t.kind == "dial" and t.params.get("prop") in wanted:
+                    tool = self._find_tool(grid, sig)
+                    if tool is not None:
+                        break
             if tool is None:
+                probe, had_candidates = self._probe_unknown(observation)
+                if probe is not None:
+                    return probe
+                if had_candidates:
+                    return None   # something to probe, just not reachable from here: let the explorer move
                 self._demote()
                 return None
             choice = self._go(observation, tool, purpose="dial")
@@ -263,11 +282,32 @@ class RulePolicy:
         for (y0, x0, y1, x1) in (pair.changeable_box, pair.static_box):
             if any(y0 <= y <= y1 and x0 <= x <= x1 for (y, x) in avatar):
                 return self.last_progress
-        progress = match_progress(grid, pair)
+        self.last_report = match_report(grid, pair)
+        progress = sum(self.last_report.values()) / len(self.last_report)
         if progress >= 1.0 and self.last_progress < 1.0:
             self._reset_exit()
         self.last_progress = progress
         return progress
+
+    def _probe_unknown(self, observation: Observation) -> tuple[ActionChoice | None, bool]:
+        """The delta list: a salient object not yet touched, nearest first (design v2 section
+        6: an unknown object gets one probe, then the tools are updated). Also says whether
+        any candidate existed at all, reachable or not."""
+        grid = observation.grid
+        had = False
+        for cand in self._salient(grid):
+            sig = _sig(cand)
+            if sig in self.probed or sig in self.store.tools:
+                continue
+            had = True
+            choice = self._go(observation, cand, purpose="probe")
+            if choice is not None:
+                if choice.reason.startswith("rules: touch probe"):
+                    self.probed.add(sig)
+                    self.diagnostics["probes"] += 1
+                    self.diagnostics["delta_probes"] = self.diagnostics.get("delta_probes", 0) + 1
+                return choice, True
+        return None, had
 
     def _anchor_goal(self, grid: np.ndarray) -> None:
         """On a new level, find the displays of the carried goal again: frames of the same
@@ -344,13 +384,26 @@ class RulePolicy:
     def _go(self, observation: Observation, target: GridObject, purpose: str) -> ActionChoice | None:
         """Walk to or touch the target, unless the bar cannot pay for the walk: then refill
         first (a known refill, else the nearest object drawn in the bar's colour)."""
+        energy = self.explorer.energy
+        grid = observation.grid
+        budgeted = (energy is not None and purpose != "refill" and self.explorer.mask_ok(grid)
+                    and not self.ambient_rises)
+        if budgeted and self.refilling:
+            # a detour once started is walked to the end: re-deciding every step dithers
+            if energy.remaining(grid) >= energy.capacity:
+                self.refilling = False
+            else:
+                refill = self._refill(observation)
+                if refill is not None:
+                    return refill
+                self.refilling = False
         choice = self._touch_or_walk(observation, target, purpose=purpose)
         if choice is None:
             return None
-        energy = self.explorer.energy
-        grid = observation.grid
-        if energy is None or purpose == "refill" or not self.explorer.mask_ok(grid) or self.ambient_rises:
+        if not budgeted:
             return choice   # no bar, or a meter that refills itself: nothing to budget
+        if energy.remaining(grid) >= energy.capacity:
+            return choice   # already full: a refill would change nothing
         need = len(self.plan) + 2 if choice.reason.startswith("rules: walk") else 1
         need += self._refill_reserve(grid, target)
         if energy.affordable(need, grid):
@@ -358,6 +411,7 @@ class RulePolicy:
         refill = self._refill(observation)
         if refill is not None:
             self.diagnostics["refill_detours"] = self.diagnostics.get("refill_detours", 0) + 1
+            self.refilling = True
             return refill
         return choice
 

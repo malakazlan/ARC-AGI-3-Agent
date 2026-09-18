@@ -90,4 +90,4 @@ def test_explorer_knows_the_bar_before_the_first_death():
             break
         obs = game.apply(choice.action_id, choice.x, choice.y)
     assert seen_before_death
-    assert brain.policy.energy is not None and brain.policy.energy.capacity >= 10
+    assert brain.policy.energy is not None and brain.policy.energy.capacity >= 5

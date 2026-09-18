@@ -13,7 +13,7 @@ class Arc3Config:
     max_actions_per_game: int = 2000
     # Action-selection policy: "graph" (explorer, control), "rules" (v2: discovery + rule store
     # on top of the explorer) or "random" (legal uniform).
-    policy: str = "graph"
+    policy: str = "rules"
     # Graph explorer: node cap per level (memory) and click candidates per state (branching).
     max_nodes_per_level: int = 5000
     max_click_candidates: int = 64
@@ -32,8 +32,8 @@ class Arc3Config:
     # skip actions whose effect is a known no-op or leads to a state already explored.
     effects: bool = True
     # Ablation switches for the two discovery changes of 2026-09-18.
-    dial_cap: bool = True        # skip confirmed key dials on avatar games
-    breadth_first: bool = True   # try every action class once before repeating any
+    dial_cap: bool = False       # skip confirmed key dials on avatar games (costs su15/tu93 with breadth-first)
+    breadth_first: bool = False  # try every action class once before repeating any (with the cap, costs su15/tu93)
     # Optional local LLM layer. Off by default; must degrade to rules-only when missing.
     reasoner_enabled: bool = False
 

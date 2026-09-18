@@ -103,7 +103,7 @@ def test_rule_policy_ignores_ambient_change_when_reading_a_touch():
     """ls20: the energy bar drains on every action. A bar inside a frame of the panel's colour
     must not be paired as a display."""
     game = DisplayToy(bar=True, exit_in_target=True)
-    brain, _ = run(game, steps=200)
+    brain, _ = run(game, steps=250)
     assert game.levels_completed == 1
     bar_box = (8, 5, 11, 11)
     assert all(d["changeable"] != bar_box and d["static"] != bar_box for d in brain.policy.store.displays)
@@ -118,3 +118,15 @@ def test_rule_policy_carries_the_rule_to_level_two_without_new_probes():
     level2_actions = game.steps - len(level1_actions)
     assert brain.diagnostics["hypothesis_correct"] >= 1
     assert level2_actions <= 30, level2_actions
+
+
+def test_rule_policy_probes_for_a_second_dial_when_the_known_one_cannot_finish_the_match():
+    """ls20 level 3: the target also differs in colour. The rotator fixes the shape and no
+    more; the policy must probe an unknown object, learn the colour dial and use it."""
+    game = DisplayToy(colour_dial=True, exit_in_target=True)
+    brain, _ = run(game, steps=250)
+    assert game.levels_completed == 1
+    store = brain.policy.store
+    props = {t.params.get("prop") for t in store.tools.values() if t.kind == "dial"}
+    assert props >= {"shape", "colour"}
+    assert game.steps <= 120

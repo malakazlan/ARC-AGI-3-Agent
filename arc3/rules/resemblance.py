@@ -14,6 +14,7 @@ import numpy as np
 from arc3.perception import GridObject, segment_objects
 
 BBox = tuple[int, int, int, int]
+MIN_FRAME_CELLS = 8  # a 3x3 ring; smaller hollow shapes (an L) are glyphs, not frames
 
 
 @dataclass(frozen=True)
@@ -51,7 +52,7 @@ def _frames(grid: np.ndarray, bg: int) -> list[GridObject]:
     for obj in segment_objects(grid, background=bg):
         y0, x0, y1, x1 = obj.bbox
         area = (y1 - y0 + 1) * (x1 - x0 + 1)
-        if area > obj.size and area >= 4:
+        if area > obj.size and obj.size >= MIN_FRAME_CELLS:
             out.append(obj)
     return out
 
@@ -66,7 +67,14 @@ def _inner_objects(grid: np.ndarray, box: BBox, frame_colour: int) -> list[GridO
     if interior.size == 0:
         return []
     vals, counts = np.unique(interior, return_counts=True)
-    bg = -1 if len(vals) == 1 else int(vals[int(np.argmax(counts))])
+    gvals, gcounts = np.unique(grid, return_counts=True)
+    global_bg = int(gvals[int(np.argmax(gcounts))])
+    if len(vals) == 1:
+        bg = -1                              # a single-colour interior is the glyph itself
+    elif global_bg in vals:
+        bg = global_bg                       # the grid's floor shows through the frame
+    else:
+        bg = int(vals[int(np.argmax(counts))])
     objs = [o for o in segment_objects(inner, background=bg) if o.color != -1]
     objs.sort(key=lambda o: -o.size)
     return objs
@@ -110,16 +118,22 @@ def display_pairs(grid: np.ndarray, changed_cells: frozenset,
     return pairs
 
 
-def match_progress(grid: np.ndarray, pair: DisplayPair) -> float:
-    """Share of inner-glyph properties (colour, scale-free shape) that already match."""
+def match_report(grid: np.ndarray, pair: DisplayPair) -> dict[str, bool]:
+    """Which inner-glyph properties (colour, scale-free shape) already match."""
     c_colour = int(grid[pair.changeable_box[0], pair.changeable_box[1]])
     s_colour = int(grid[pair.static_box[0], pair.static_box[1]])
     c_inner = _inner_objects(grid, pair.changeable_box, c_colour)
     s_inner = _inner_objects(grid, pair.static_box, s_colour)
     if not c_inner or not s_inner:
-        return 0.0
+        return {"colour": False, "shape": False}
     a, b = c_inner[0], s_inner[0]
-    matched = 0
-    matched += int(a.color == b.color)
-    matched += int(normalized_shape(frozenset(a.cells)) == normalized_shape(frozenset(b.cells)))
-    return matched / 2.0
+    return {
+        "colour": a.color == b.color,
+        "shape": normalized_shape(frozenset(a.cells)) == normalized_shape(frozenset(b.cells)),
+    }
+
+
+def match_progress(grid: np.ndarray, pair: DisplayPair) -> float:
+    """Share of inner-glyph properties that already match."""
+    report = match_report(grid, pair)
+    return sum(report.values()) / len(report)
