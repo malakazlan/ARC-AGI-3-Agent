@@ -151,3 +151,14 @@ Dev machine: i5-7300HQ, 4 cores, 7.7 GB RAM in WSL. Benchmarks with many seeds w
 - Parallel benchmark runner: `make bench` uses 4 workers.
 - Next by the bottleneck ranking: the count-to-zero goal template (win probe: 3 of 10 wins),
   the click dead-signature rule, then the subgoal plan with energy for ls20 L3.
+
+## 2026-09-18 - Night: reach and collect templates
+
+- Built T2 reach (hollow frame -> avatar-coloured rare object -> other rare object, verified by
+  level-up) and T5 collect (a touched object that vanishes with no other effect is a
+  consumable; take every instance, then retry the reach targets). Explorer probes unknown
+  keys in place. 209 tests; reach toy 25 steps, collect toy 102, carry-over 40.
+- Dev, 3 seeds: **13 median levels, RHAE 1.33** (`2026-09-18-reach-dev`; tu93 [3,3,3],
+  otherwise within noise of 1.36). Kept.
+- Next: click dead-signature rule (trace probe: 4% dead clicks, 12% bar-only), then the
+  energy subgoal plan for ls20 L3.
