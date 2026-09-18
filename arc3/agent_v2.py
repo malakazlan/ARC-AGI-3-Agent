@@ -65,6 +65,11 @@ class RulePolicy:
         self.energy_before: int | None = None         # bar reading when we pressed into a tool
         self.ambient_rises = 0                       # bar rises seen while the avatar stood still
         self.refilling = False                       # committed to a refill detour until it lands
+        self.reach_tried: set[tuple] = set()         # reach candidates that did not end the level
+        self.pending_consumable: tuple | None = None # (signature, cells) covered by the avatar after a touch
+        self.reach_target: tuple | None = None       # (signature, box) being entered right now
+        self.reach_presses = 0
+        self.reach_blocked = 0
         self._last_key: int | None = None
         self.prev_changed: frozenset = frozenset()   # cells that changed on the previous action
         self.goal_needs_anchor = False
@@ -92,6 +97,7 @@ class RulePolicy:
             self.touches = 0
             self.last_progress = 0.0
             self.refilling = False
+            self._reset_reach()
             self._reset_exit()
             self.last_grid = observation.grid
             self.prev_changed = frozenset()
@@ -111,6 +117,19 @@ class RulePolicy:
         if observation.grid is not None and self.last_grid is not None and self.pending_touch is not None:
             self._read_touch(self.last_grid, observation.grid)
         self.pending_touch = None
+        if self.pending_consumable is not None and observation.grid is not None and self.explorer.avatar is not None:
+            sig, cells = self.pending_consumable
+            avatar_now = self.explorer.avatar.last_cells or frozenset()
+            if not (cells & avatar_now):
+                g = observation.grid
+                back = any(0 <= y < g.shape[0] and 0 <= x < g.shape[1] and int(g[y, x]) == sig[0] for (y, x) in cells)
+                known = self.store.tool(sig)
+                if known is None or known.kind not in ("dial", "refill"):
+                    self.store.set_tool(sig, "no_op" if back else "consumable")
+                    if not back:
+                        self.diagnostics["consumables"] = self.diagnostics.get("consumables", 0) + 1
+                        self.reach_tried = set()    # the world changed: places refused before may open
+                self.pending_consumable = None
         if observation.grid is not None and self.last_grid is not None and self.last_grid.shape == observation.grid.shape:
             ys, xs = np.nonzero(observation.grid != self.last_grid)
             self.prev_changed = frozenset(zip(ys.tolist(), xs.tolist()))
@@ -120,6 +139,7 @@ class RulePolicy:
             after = self.explorer.avatar.avatar_cells(observation.grid)
             if after == self.pending_exit:
                 self.entry_blocked += 1
+                self.reach_blocked += 1
         self.pending_exit = None
         if observation.grid is not None:
             self.last_grid = observation.grid
@@ -147,6 +167,21 @@ class RulePolicy:
         side = [e for e in extract_events(before, after, mask)
                 if not (set(e.cells) & touched_cells) and not (set(e.cells) <= ambient)]
         if not side:
+            # nothing else changed: did the touched thing itself vanish (a collectible)?
+            avatar_now = self.explorer.avatar.last_cells or frozenset() if self.explorer.avatar else frozenset()
+            left = [c for c in cells if c not in avatar_now]
+            gone = all(int(after[y, x]) != signature[0] for (y, x) in left)
+            known = self.store.tool(signature)
+            if gone and (known is None or known.kind not in ("dial", "refill")):
+                if left:
+                    self.store.set_tool(signature, "consumable")   # touching it takes it: collect
+                    self.diagnostics["consumables"] = self.diagnostics.get("consumables", 0) + 1
+                    self.reach_tried = set()        # the world changed: places refused before may open
+                else:
+                    # the avatar covers it: decide when it has moved off (gone = consumable,
+                    # back = something we can walk over)
+                    self.pending_consumable = (signature, frozenset(cells))
+                return
             if signature not in self.store.tools:
                 self.store.set_tool(signature, "no_op")
             return
@@ -170,6 +205,10 @@ class RulePolicy:
                     self.diagnostics["actions_to_hypothesis"] = self._actions
 
     def _level_up(self, levels: int) -> None:
+        if self.store.goal is None and self.reach_target is not None:
+            sig, _box = self.reach_target
+            self.store.propose_goal(Goal("reach", {"target": sig}, confidence=0.6))
+            self.diagnostics["reach_goals"] = self.diagnostics.get("reach_goals", 0) + 1
         if self.store.goal is not None:
             self.diagnostics["hypothesis_correct"] += 1
             self.store.goal.confidence = min(0.95, self.store.goal.confidence + 0.2)
@@ -182,7 +221,14 @@ class RulePolicy:
         self.tool_cells = {}
         self.plan = []
         self.touches = 0
+        self.reach_tried = set()
+        self._reset_reach()
         self._reset_exit()
+
+    def _reset_reach(self) -> None:
+        self.reach_target = None
+        self.reach_presses = 0
+        self.reach_blocked = 0
 
     def _reset_exit(self) -> None:
         self.entry_presses = 0
@@ -222,9 +268,24 @@ class RulePolicy:
             if choice is not None:
                 self.diagnostics["exploit_steps"] += 1
                 return choice
+        choice = self._collect(observation)
+        if choice is not None:
+            self.mode = "collect"
+            self.diagnostics["mode"] = "collect"
+            return choice
+        if self.store.goal is not None and self.store.goal.template == "reach":
+            self.mode = "exploit"
+            self.diagnostics["mode"] = "exploit"
+            choice = self._reach(observation, known=self.store.goal.params.get("target"))
+            if choice is not None:
+                self.diagnostics["exploit_steps"] += 1
+                return choice
         self.mode = "discover"
         self.diagnostics["mode"] = "discover"
-        return self._discover(observation)
+        choice = self._discover(observation)
+        if choice is not None:
+            return choice
+        return self._reach(observation, known=None)
 
     # -- exploit (T1) ------------------------------------------------------------------------
 
@@ -317,6 +378,8 @@ class RulePolicy:
 
         self.goal_needs_anchor = False
         goal = self.store.goal
+        if goal.template != "match_display":
+            return
         old = goal.params["pair"]
         vals, counts = np.unique(grid, return_counts=True)
         bg = int(vals[int(np.argmax(counts))])
@@ -348,14 +411,29 @@ class RulePolicy:
         if self.display_exit_tried:
             return None
         grid = observation.grid
-        y0, x0, y1, x1 = pair.static_box
-        box = frozenset((y, x) for y in range(y0, y1 + 1) for x in range(x0, x1 + 1))
-        centre = ((y0 + y1) // 2, (x0 + x1) // 2)
         avatar = self.explorer.avatar.avatar_cells(grid)  # type: ignore[union-attr]
+        y0, x0, y1, x1 = pair.static_box
+        centre = ((y0 + y1) // 2, (x0 + x1) // 2)
         if centre in avatar or self.entry_presses >= ENTRY_LIMIT or self.entry_blocked >= 2:
             self.display_exit_tried = True
             return None
-        # adjacent or inside: the press that brings the avatar closest to the centre
+        choice, pressed = self._enter_box(observation, pair.static_box, purpose="exit")
+        if choice is None:
+            self.display_exit_tried = True
+            return None
+        if pressed:
+            self.entry_presses += 1
+        return choice
+
+    def _enter_box(self, observation: Observation, box_bounds: tuple, purpose: str) -> tuple[ActionChoice | None, bool]:
+        """One step of entering a box: when a press moves the avatar into or deeper into the
+        box, the press that brings it closest to the centre (returns (choice, True)); else a
+        walk towards the box (choice, False); (None, False) when unreachable."""
+        grid = observation.grid
+        y0, x0, y1, x1 = box_bounds
+        box = frozenset((y, x) for y in range(y0, y1 + 1) for x in range(x0, x1 + 1))
+        centre = ((y0 + y1) // 2, (x0 + x1) // 2)
+        avatar = self.explorer.avatar.avatar_cells(grid)  # type: ignore[union-attr]
         best = None
         for key, vec in self.explorer._known_vectors().items():
             if not (swept_cells(avatar, vec) & box):
@@ -367,16 +445,101 @@ class RulePolicy:
                 best = (dist, key)
         if best is not None:
             self.plan = []
-            self.entry_presses += 1
             self.pending_exit = avatar
-            return ActionChoice(best[1], None, None, f"rules: touch exit (display) with key {best[1]}")
-        target = GridObject(color=int(grid[y0, x0]), size=len(box), bbox=pair.static_box,
+            self.pending_touch = None
+            return ActionChoice(best[1], None, None, f"rules: touch {purpose} (enter) with key {best[1]}"), True
+        target = GridObject(color=int(grid[y0, x0]), size=len(box), bbox=box_bounds,
                             centroid=((y0 + y1) / 2, (x0 + x1) / 2), anchor=(y0, x0),
                             cells=tuple(sorted(box - avatar)))
-        choice = self._go(observation, target, purpose="exit")
-        if choice is None:
-            self.display_exit_tried = True
+        choice = self._go(observation, target, purpose=purpose)
+        return choice, False
+
+    # -- T5 collect and T2 reach ---------------------------------------------------------------
+
+    def _collect(self, observation: Observation) -> ActionChoice | None:
+        """Objects of a class that vanishes when touched: take the nearest remaining one."""
+        grid = observation.grid
+        kinds = {sig for sig, t in self.store.tools.items() if t.kind == "consumable"}
+        if not kinds:
             return None
+        avatar = self.explorer.avatar.avatar_cells(grid) if self.explorer.avatar else frozenset()
+        ay, ax = min(avatar) if avatar else (0, 0)
+        cands = [o for o in self._objects(grid, avatar) if _sig(o) in kinds]
+        cands.sort(key=lambda o: abs(o.anchor[0] - ay) + abs(o.anchor[1] - ax))
+        for cand in cands:
+            choice = self._go(observation, cand, purpose="collect")
+            if choice is not None:
+                return choice
+        return None
+
+    def _reach_candidates(self, grid: np.ndarray) -> list[GridObject]:
+        """Places worth entering, best first: rare hollow frames big enough for the avatar,
+        then rare objects in the avatar's colour, then other rare small objects."""
+        ex = self.explorer
+        avatar = ex.avatar.avatar_cells(grid) if ex.avatar else frozenset()
+        av_h = (max(y for y, _ in avatar) - min(y for y, _ in avatar) + 1) if avatar else 1
+        av_w = (max(x for _, x in avatar) - min(x for _, x in avatar) + 1) if avatar else 1
+        av_colour = ex.avatar.signature[0] if ex.avatar and ex.avatar.signature else None
+        objects = self._objects(grid, avatar)
+        counts: dict[tuple, int] = {}
+        for o in objects:
+            counts[_sig(o)] = counts.get(_sig(o), 0) + 1
+        mask = ex.mask if (ex.mask is not None and ex.mask.shape == grid.shape) else None
+        scored = []
+        ay, ax = min(avatar) if avatar else (0, 0)
+        for o in objects:
+            sig = _sig(o)
+            if counts[sig] > RARE or set(o.cells) & avatar or (mask is not None and any(mask[y, x] for (y, x) in o.cells)):
+                continue
+            if ex.passability.lethal(int(o.color)):
+                continue
+            y0, x0, y1, x1 = o.bbox
+            h, w = y1 - y0 + 1, x1 - x0 + 1
+            hollow = h * w > o.size and o.size >= 8 and h - 2 >= av_h and w - 2 >= av_w
+            tool = self.store.tool(sig)
+            if tool is not None and tool.kind in ("dial", "refill", "consumable"):
+                continue
+            if o.size > 64:
+                continue
+            tier = 0 if hollow else (1 if int(o.color) == av_colour else 2)
+            if tier == 2 and o.size > SMALL:
+                continue
+            scored.append((tier, abs(o.anchor[0] - ay) + abs(o.anchor[1] - ax), o))
+        scored.sort(key=lambda t: (t[0], t[1]))
+        return [o for _, _, o in scored]
+
+    def _reach(self, observation: Observation, known: tuple | None) -> ActionChoice | None:
+        """T2: enter a candidate place; the level-up verifies it. A candidate whose entry budget
+        runs out without a level-up is set aside for this level."""
+        grid = observation.grid
+        avatar = self.explorer.avatar.avatar_cells(grid) if self.explorer.avatar else frozenset()
+        if not avatar:
+            return None
+        # keep entering the current target while it makes sense
+        if self.reach_target is not None:
+            sig, box = self.reach_target
+            y0, x0, y1, x1 = box
+            centre = ((y0 + y1) // 2, (x0 + x1) // 2)
+            exhausted = self.reach_presses >= ENTRY_LIMIT or self.reach_blocked >= 2 or centre in avatar
+            if exhausted:
+                self.reach_tried.add(sig)
+                self._reset_reach()
+        if self.reach_target is None:
+            cands = self._reach_candidates(grid)
+            if known is not None:
+                cands.sort(key=lambda o: 0 if _sig(o) == known else 1)
+            cands = [o for o in cands if _sig(o) not in self.reach_tried]
+            if not cands:
+                return None
+            self.reach_target = (_sig(cands[0]), cands[0].bbox)
+        sig, box = self.reach_target
+        choice, pressed = self._enter_box(observation, box, purpose="reach")
+        if choice is None:
+            self.reach_tried.add(sig)
+            self._reset_reach()
+            return None
+        if pressed:
+            self.reach_presses += 1
         return choice
 
     # -- energy ------------------------------------------------------------------------------

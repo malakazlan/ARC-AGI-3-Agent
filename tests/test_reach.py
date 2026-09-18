@@ -1,0 +1,47 @@
+"""Reach and collect goal templates on the reach toy."""
+from __future__ import annotations
+
+from arc3.agent import Orchestrator
+from arc3.config import Arc3Config
+from tests.toy_reach import ReachToy
+
+
+def run(game, seed=0, steps=200, policy="rules", **cfg):
+    brain = Orchestrator(Arc3Config(seed=seed, policy=policy, **cfg), game_id="reach", started_at=0.0)
+    obs = game.observe()
+    log = []
+    for _ in range(steps):
+        if brain.is_done(obs, now=1.0):
+            break
+        choice = brain.choose(obs, now=1.0)
+        log.append((obs, choice))
+        obs = game.apply(choice.action_id, choice.x, choice.y)
+    return brain, log
+
+
+def test_rule_policy_reaches_a_hollow_target_and_wins():
+    """T2: a rare hollow frame is a place to enter. Entering it wins; decoys are probed once."""
+    game = ReachToy()
+    brain, _ = run(game, steps=150)
+    assert game.levels_completed == 1
+    assert game.steps <= 80
+    assert brain.policy.store.goal is not None and brain.policy.store.goal.template == "reach"
+
+
+def test_rule_policy_collects_vanishing_objects_then_reaches():
+    """T3/T5: dots vanish when touched (the count drops under our action), so the goal is to
+    take every dot, then enter the target."""
+    game = ReachToy(collect=3)
+    brain, _ = run(game, steps=250)
+    assert game.levels_completed == 1
+    assert game.steps <= 140
+    kinds = {t.kind for t in brain.policy.store.tools.values()}
+    assert "consumable" in kinds
+
+
+def test_reach_goal_carries_to_the_next_level():
+    game = ReachToy(levels=2)
+    brain, _ = run(game, steps=250)
+    assert game.levels_completed == 2
+    level1 = brain.policy.store.level_paths[0]
+    assert game.steps - len(level1) <= 40

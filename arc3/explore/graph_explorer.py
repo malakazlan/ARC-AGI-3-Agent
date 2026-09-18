@@ -91,6 +91,7 @@ class GraphExplorer:
         self.energy: EnergyModel | None = None
         self.restarted = False  # the last observation was a silent level restart
         self.lethal_moves: set[tuple[frozenset, int]] = set()  # (avatar cells, key) presses that ended the game
+        self.probed_here: set[tuple[frozenset, int]] = set()   # (avatar cells, key) pressed in place to learn terrain
         self.drain_values: dict[tuple[int, int], int] = {}  # bar cell -> value it drains to
         self.last_grid: np.ndarray | None = None
         self.budget: int | None = None
@@ -645,7 +646,18 @@ class GraphExplorer:
             cells = self.avatar.avatar_cells(self.current_grid)  # type: ignore[union-attr]
             path = plan_moves(self.current_grid, cells, self._known_vectors(), self.passability, goal=None,
                               forbidden=self.lethal_moves)  # type: ignore[arg-type]
+            if path is None:
+                return None
             if not path:
+                # already where a key's outcome is unknown: press that key now instead of
+                # planning the same empty route again next turn
+                for key, vec in self._known_vectors().items():
+                    if (cells, key) in self.lethal_moves or (cells, key) in self.probed_here:
+                        continue
+                    if predict_move(self.current_grid, cells, vec, self.passability, cells) is None:
+                        self.probed_here.add((cells, key))   # once per position and key
+                        self.diagnostics["planned_moves"] += 1
+                        return (key, None, None), "planner: probe unknown terrain here"
                 return None
             self.move_plan = list(path)
         key = self.move_plan.pop(0)
@@ -769,6 +781,7 @@ class GraphExplorer:
         self.energy = None
         self.level_start = None
         self.lethal_moves = set()
+        self.probed_here = set()
         self.trail = set()
         self.drain_values = {}
         self.last_grid = None
