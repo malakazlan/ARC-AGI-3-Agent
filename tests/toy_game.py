@@ -34,11 +34,12 @@ def level_layout(index: int) -> np.ndarray:
 class ToyGame:
     def __init__(self, available=(1, 2, 3, 4), levels: int = 2,
                  extra_cells: dict[tuple[int, int], int] | None = None,
-                 budget: int | None = None) -> None:
+                 budget: int | None = None, dial_cell: tuple[int, int] | None = None) -> None:
         self.available = list(available)
         self.levels = levels
         self.extra_cells = dict(extra_cells or {})
         self.budget = budget          # actions per attempt before GAME_OVER; bar on row 7
+        self.dial_cell = dial_cell    # ACTION7 cycles this cell through colours 8, 9, 10
         self.attempt_steps = 0
         self.level = 0
         self.levels_completed = 0
@@ -53,6 +54,8 @@ class ToyGame:
             g[y, x] = color
         if self.budget is not None:
             g[7, :] = 6                  # full energy bar
+        if self.dial_cell is not None:
+            g[self.dial_cell] = 8
         self.attempt_steps = 0
         return g
 
@@ -84,6 +87,8 @@ class ToyGame:
             self.grid[y, x] = 0
         elif action_id == 5:
             self._commit()
+        elif action_id == 7 and self.dial_cell is not None:
+            self.grid[self.dial_cell] = 8 + (int(self.grid[self.dial_cell]) - 8 + 1) % 3
         self._tick_budget()
         return self.observe()
 
@@ -102,6 +107,8 @@ class ToyGame:
             return
         if self.budget is not None and ny == 7:
             return                       # the energy bar row is not walkable
+        if self.dial_cell is not None and (ny, nx) == self.dial_cell:
+            return                       # the dial is a fixture, not floor
         target = self.grid[ny, nx]
         self.grid[py, px] = 0
         if target == 3:

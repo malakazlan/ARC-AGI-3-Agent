@@ -33,11 +33,13 @@ def test_explorer_never_repeats_a_tested_pair_while_a_frontier_exists():
 
 
 def test_explorer_marks_game_over_edges_and_never_retries_them():
-    game = ToyGame(levels=1, extra_cells={(1, 2): 3})   # trap right next to the start
-    brain, log = run(game, steps=80, planner=False)     # with the planner it wins before dying
+    # trap right next to the start; goal removed so exploration keeps going until the trap is tested
+    game = ToyGame(levels=1, extra_cells={(1, 2): 3, (6, 6): 0})
+    brain, log = run(game, steps=120, planner=False)
     explorer = brain.policy
-    # the trap has up to four approaches; each (state, action) pair may end the game once
-    assert 1 <= game.game_overs <= 4
+    # two traps (one placed, one in the layout), up to four approaches each; every (state, action)
+    # pair may end the game once
+    assert 1 <= game.game_overs <= 8
     assert explorer.diagnostics["game_overs"] == game.game_overs
     assert explorer.diagnostics["game_over_retries"] == 0
     resets = sum(1 for _, c in log if c.action_id == 0)
@@ -286,3 +288,27 @@ def test_no_op_key_effect_is_skipped_by_avatar_appearance():
     live = ex._live_untested(key, count=True)
     assert (7, None, None) not in live
     assert ex.diagnostics["effects_avoided"] == 1
+
+
+# --- dials --------------------------------------------------------------------------------
+
+def test_dial_key_is_pressed_at_most_a_few_cycles_not_once_per_state():
+    """ACTION7 cycles a lamp through 3 colours. Once the cycle is known, the explorer stops
+    pressing it in every new position."""
+    game = ToyGame(levels=1, available=[1, 2, 3, 4, 7], extra_cells={(6, 6): 0}, dial_cell=(0, 7))
+    brain, log = run(game, steps=300)
+    ex = brain.policy
+    assert ex.dials.period((7,)) == 3
+    sevens = sum(1 for _, c in log if c.action_id == 7)
+    assert sevens <= 12
+    assert ex.diagnostics["dial_capped"] > 0
+
+
+# --- discovery: breadth over keys before depth --------------------------------------------
+
+def test_each_key_is_tried_once_before_any_key_is_repeated():
+    """The first presses must be four different keys, even when the first one succeeded."""
+    game = ToyGame(levels=1)
+    brain, log = run(game, steps=8)
+    keys = [c.action_id for _, c in log if c.action_id in (1, 2, 3, 4)][:4]
+    assert sorted(keys) == [1, 2, 3, 4]

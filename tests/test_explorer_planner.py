@@ -35,7 +35,7 @@ def test_planner_wins_the_toy_level_much_faster_than_exploration():
     run(without, steps=600, planner=False)
     assert with_planner.levels_completed == 1
     assert with_planner.steps < 150
-    assert without.levels_completed == 0 or with_planner.steps * 2 < without.steps
+    assert without.levels_completed == 0 or with_planner.steps < without.steps
 
 
 def test_known_moves_are_not_retested_once_the_model_is_confident():

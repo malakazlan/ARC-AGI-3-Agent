@@ -22,8 +22,8 @@ from arc3.perception import AttemptSignature, countdown_mask_from_signatures, se
 from arc3.plan import path_to_nearest_frontier, plan_moves
 from arc3.types import COMPLEX_ACTION_ID, ActionChoice, ActionKey, Observation
 from arc3.world_model import (
-    ActionPrior, AvatarModel, ClickEffects, KeyEffects, PassabilityModel, StateGraph, cells_ahead,
-    click_class, object_signature, predict_move,
+    ActionPrior, AvatarModel, ClickEffects, DialModel, KeyEffects, PassabilityModel, StateGraph,
+    cells_ahead, click_class, object_signature, predict_move,
 )
 
 MOVE_KEYS = (1, 2, 3, 4)
@@ -69,6 +69,7 @@ class GraphExplorer:
         self.key_effects: KeyEffects | None = KeyEffects() if use_effects else None
         self.click_sig: dict[tuple[str, ActionKey], tuple] = {}  # (state key, click) -> object signature
         self.floor: Counter = Counter()  # colours revealed where the avatar used to stand
+        self.dials = DialModel()  # action classes that cycle a property with a period
         self._last_signatures: dict[ActionKey, tuple] = {}
         self.graph = StateGraph(max_nodes)
         self.level_index = 0
@@ -92,7 +93,7 @@ class GraphExplorer:
             "levels_seen": 0, "win_path_lengths": [], "budget_deaths": 0, "mask_cells": 0,
             "budget": None, "graph_rebuilds": 0, "deferred_picks": 0,
             "retests_avoided": 0, "mismatches": 0, "planner_resets": 0, "planned_moves": 0,
-            "avatar_known_at": None, "kill_colours": 0, "effects_avoided": 0,
+            "avatar_known_at": None, "kill_colours": 0, "effects_avoided": 0, "dial_capped": 0,
         }
 
     # -- learning from what happened -------------------------------------------------------
@@ -127,6 +128,8 @@ class GraphExplorer:
             changed = key != src
             self.graph.record(src, action, key, changed=changed, game_over=False, level_up=False)
             self._record_effect(src, action, changed=changed, game_over=False)
+            if action[0] not in MOVE_KEYS:
+                self.dials.note(self.graph.action_class(src, action), src, key)
             self.pending = None
         if key not in self.graph:
             if self.diagnostics["levels_seen"] == 0 or self.graph.size() == 0:
@@ -492,7 +495,14 @@ class GraphExplorer:
                     continue
                 kept.append(a)
             untested = kept
-        return untested
+        kept = []
+        for a in untested:
+            if a[0] not in MOVE_KEYS and self.dials.confirmed(self.graph.action_class(key, a)):
+                if count:
+                    self.diagnostics["dial_capped"] += 1
+                continue  # a confirmed dial teaches nothing new in a new state
+            kept.append(a)
+        return kept
 
     def _has_live_untested(self, key: str) -> bool:
         return bool(self._live_untested(key))
@@ -503,8 +513,13 @@ class GraphExplorer:
         tier = simple or actions
         if self.prior is None:
             return self.rng.choice(tier)
-        scored = [(self.prior.score(self.graph.action_class(key, a)), self.rng.random(), a) for a in tier]
-        return max(scored)[2]
+        def tries(a: ActionKey) -> int:
+            stats = self.prior.stats.get(self.graph.action_class(key, a))  # type: ignore[union-attr]
+            return stats.tries if stats else 0
+
+        scored = [(tries(a) == 0, self.prior.score(self.graph.action_class(key, a)), self.rng.random(), a)
+                  for a in tier]
+        return max(scored)[3]
 
     def _plan_from(self, key: str, is_frontier) -> list[tuple[str, ActionKey]]:
         path = path_to_nearest_frontier(self.graph, key, is_frontier)
