@@ -51,24 +51,23 @@ def validate_avatar(t: Trace) -> dict | None:
     mask = bar_mask(t)
     model = AvatarModel()
     first_known = None
-    checked = correct = 0
+    checked = consistent = blocked = 0
     n = len(t.actions)
     for i in range(1, n):
         a = int(t.actions[i])
         if a not in MOVE_KEYS or t.states[i - 1] != "NOT_FINISHED" or t.states[i] != "NOT_FINISHED" or t.levels[i] != t.levels[i - 1]:
             continue
         before, after = t.grids[i - 1], t.grids[i]
-        if model.confident and model.vector(a) is not None:
-            cells = model.avatar_cells(before)
-            if cells:
-                predicted = model.predict_cells(cells, a)
-                diff = (before != after) & ~mask
-                if diff.any():
-                    checked += 1
-                    # correct if the avatar template is found at the predicted cells afterwards
-                    found = model.avatar_cells(after)
-                    correct += int(found == predicted)
-        model.observe(before, a, after, mask)
+        expected = model.vector(a) if model.confident else None
+        known = expected is not None and bool(model.last_cells)
+        outcome = model.observe(before, a, after, mask)
+        if known and outcome in ("moved", "blocked"):
+            checked += 1
+            if outcome == "blocked":
+                blocked += 1
+                consistent += 1  # the avatar stayed: a passability fact, not a misprediction
+            else:
+                consistent += int(model.last_vector.get(a) == expected)
         if first_known is None and any(model.vector(k) is not None for k in MOVE_KEYS):
             first_known = i
     keymap = {k: model.vector(k) for k in MOVE_KEYS if model.vector(k) is not None}
@@ -79,7 +78,8 @@ def validate_avatar(t: Trace) -> dict | None:
         "first_known_step": first_known,
         "keymap": keymap,
         "pred_checked": checked,
-        "pred_correct": correct,
+        "pred_correct": consistent,
+        "blocked": blocked,
     }
 
 
@@ -119,13 +119,13 @@ def main() -> None:
     folder = Path(sys.argv[1]) if len(sys.argv) > 1 else ROOT / "experiments" / "2026-09-18-prior-traces"
     traces = [Trace.load(p) for p in sorted((folder / "traces").glob("*.npz"))]
     print("=== avatar model (keyboard games)")
-    print(f"{'game':6} {'moves':>5} {'explained':>9} {'known@':>6} {'pred ok':>9}  keymap")
+    print(f"{'game':6} {'moves':>5} {'explained':>9} {'known@':>6} {'consistent':>10} {'blocked':>7}  keymap")
     for t in traces:
         r = validate_avatar(t)
         if r is None:
             continue
-        ok = f"{r['pred_correct']}/{r['pred_checked']}" if r["pred_checked"] else "-"
-        print(f"{r['game']:6} {r['moves']:>5} {100 * r['explained']:>8.0f}% {str(r['first_known_step']):>6} {ok:>9}  {r['keymap']}")
+        ok = f"{100 * r['pred_correct'] / r['pred_checked']:.0f}% of {r['pred_checked']}" if r["pred_checked"] else "-"
+        print(f"{r['game']:6} {r['moves']:>5} {100 * r['explained']:>8.0f}% {str(r['first_known_step']):>6} {ok:>10} {r['blocked']:>7}  {r['keymap']}")
     print("\n=== click effects by signature (click games)")
     print(f"{'game':6} {'clicks':>6} {'predicted':>9} {'correct':>7} {'sigs':>5} {'global':>6}")
     for t in traces:

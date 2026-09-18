@@ -150,3 +150,40 @@ def test_static_objects_elsewhere_do_not_disturb_the_translation():
     a[3, 1:5] = 5; b[3, 2:6] = 5
     tr = find_translation(a, b)
     assert tr is not None and (tr.dy, tr.dx) == (0, 1) and tr.explained >= 0.99
+
+
+def ring(g, y, x, eye):
+    """A 3x3 avatar: colour-1 ring with an 'eye' of colour `eye` in the middle, top-left (y, x)."""
+    g[y:y + 3, x:x + 3] = 1
+    g[y + 1, x + 1] = eye
+
+
+def test_avatar_that_changes_appearance_is_still_tracked_by_continuity():
+    """A facing sprite: the eye changes colour when the avatar moves. Tracking must follow it."""
+    frames = []
+    for k in range(4):
+        g = grid8(); ring(g, 2, k, 2); frames.append(g)
+    model = AvatarModel()
+    for k in range(3):
+        model.observe(frames[k], 4, frames[k + 1])
+    before = frames[-1]
+    cells = model.avatar_cells(before)
+    assert len(cells) == 9
+    after = grid8(); ring(after, 2, 4, 3)       # moved right by one, eye now colour 3
+    assert model.observe(before, 4, after) == "moved"
+    assert model.last_cells == {(y, x + 1) for (y, x) in cells}
+    assert model.avatar_cells(after) == model.last_cells
+
+
+def test_blocked_move_keeps_the_avatar_where_it_was_even_if_the_frame_changed_elsewhere():
+    frames, actions = sequence([(4, 0, 1)] * 3)
+    model = AvatarModel()
+    for k, action in enumerate(actions):
+        model.observe(frames[k], action, frames[k + 1])
+    before = frames[-1]
+    cells = model.avatar_cells(before)
+    after = before.copy()
+    after[0, 0] = 9                            # something unrelated changed
+    outcome = model.observe(before, 4, after)
+    assert outcome == "blocked"
+    assert model.avatar_cells(after) == cells

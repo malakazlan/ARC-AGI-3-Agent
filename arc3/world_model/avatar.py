@@ -16,6 +16,7 @@ from arc3.perception import find_translation
 MIN_VOTES = 3
 MIN_SHARE = 0.6
 MIN_EXPLAINED = 0.8
+MIN_OVERLAP = 0.5  # a partial-appearance move must overlap the tracked avatar this much
 
 Cells = frozenset[tuple[int, int]]
 
@@ -23,6 +24,7 @@ Cells = frozenset[tuple[int, int]]
 class AvatarModel:
     def __init__(self) -> None:
         self.votes: dict[int, Counter] = defaultdict(Counter)
+        self.last_vector: dict[int, tuple[int, int]] = {}  # latest explained displacement per key
         self.blocked_votes = 0
         self.template: dict[tuple[int, int], int] | None = None  # relative (dy, dx) -> colour
         self.last_cells: Cells | None = None
@@ -32,21 +34,42 @@ class AvatarModel:
     # -- learning ---------------------------------------------------------------------------
 
     def observe(self, before: np.ndarray, action: int, after: np.ndarray,
-                mask: np.ndarray | None = None) -> None:
+                mask: np.ndarray | None = None) -> str:
+        """Learn from one key press. Returns "blocked", "moved" or "unexplained"."""
         diff = before != after
         if mask is not None:
             diff &= ~mask
         if not diff.any():
             self.blocked_votes += 1
-            return
+            return "blocked"
         self.moves_seen += 1
         tr = find_translation(before, after, mask)
-        if tr is None or tr.explained < MIN_EXPLAINED:
-            return
+        tracked = None
+        if self.last_cells and self.template and _matches(before, self.template, self.last_cells):
+            tracked = self.last_cells
+        if tr is None:
+            if tracked is not None:
+                self.blocked_votes += 1
+                return "blocked"  # the avatar stayed; something else changed
+            return "unexplained"
+        moved = set(tr.cells)
+        overlap = len(moved & tracked) / len(tracked) if tracked else 0.0
+        if tr.explained < MIN_EXPLAINED and overlap < MIN_OVERLAP:
+            if tracked is not None and not (moved & tracked):
+                self.blocked_votes += 1
+                return "blocked"  # something else moved, not the avatar
+            return "unexplained"
         self.moves_explained += 1
         self.votes[action][(tr.dy, tr.dx)] += 1
-        self.last_cells = frozenset((y + tr.dy, x + tr.dx) for (y, x) in tr.cells)
+        self.last_vector[action] = (tr.dy, tr.dx)
+        source = tracked if (tracked is not None and overlap >= MIN_OVERLAP) else frozenset(tr.cells)
+        h, w = after.shape
+        shifted = frozenset((y + tr.dy, x + tr.dx) for (y, x) in source)
+        if any(not (0 <= y < h and 0 <= x < w) for (y, x) in shifted):
+            shifted = frozenset((y + tr.dy, x + tr.dx) for (y, x) in tr.cells)  # moved cells are in-bounds
+        self.last_cells = shifted
         self.template = _template(after, self.last_cells)
+        return "moved"
 
     # -- what we know -----------------------------------------------------------------------
 

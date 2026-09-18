@@ -73,3 +73,15 @@ Dev machine: i5-7300HQ, 4 cores, 7.7 GB RAM in WSL. Benchmarks with many seeds w
 - `eval/action_accounting.py` on the 11 won levels (seed 0): learn 4%, retest 77%, navigate
   11%, waste 8% of 4630 actions. Learning alone is 198 actions, about 18 per level, i.e. human
   scale. Re-testing known mechanics in every new state is what costs the score.
+
+## 2026-09-18 — Step 1 of the goal/planning layer (offline validated)
+
+- Built and validated offline, not yet wired in: object-level translation finder, avatar model
+  (key vectors, continuity tracking, blocked outcomes), click effects by object signature,
+  `eval/validate_models.py`. 122 tests.
+- Gate met: key map within 20 actions on 9 of 11 keyboard games; move predictions consistent
+  in 100% on 7 games, 92% sc25, 85% tu93, 79% m0r0, 73% wa30. Click outcomes predictable by
+  signature on lp85 93%, sb26 95%, ft09 40%; not on r11l, su15, s5i5 (position or timing).
+- Next: step 2, passability per colour + A* between frontier states with the mismatch check;
+  merge metric re-test share < 20% (keyboard and click reported separately) and median actions
+  per won level down 2x.

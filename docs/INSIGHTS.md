@@ -72,3 +72,10 @@ Implementation details belong in DECISIONS.md, not here. Mark unverified beliefs
   the key-to-direction map is game-specific (m0r0, sc25). Winning clicks target one colour per
   game and vc33 uses the same colour on levels 1 and 2. Agentness and a carried goal are
   cheap to detect and are exactly what the tutorial level is designed to teach.
+- 2026-09-18 (`2026-09-18-step1-validation`) — Seeing motion at object level is what makes it
+  robust: matching segmented objects by colour, shape and size reads the true displacement
+  where a cell-level rule confuses a uniform block moving one cell with its own width. Avatars
+  step 3 to 6 cells per key, never 1, so "adjacent cell" is the wrong unit; the learned vector
+  is. A blocked key with the frame changing elsewhere is the cheapest passability fact there
+  is. Where clicks act on the thing clicked, an object signature predicts the outcome nearly
+  perfectly (lp85 93%, sb26 95%); where position or timing decides, it predicts nothing.
