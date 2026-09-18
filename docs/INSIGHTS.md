@@ -87,3 +87,14 @@ Implementation details belong in DECISIONS.md, not here. Mark unverified beliefs
   a property of objects or tracks, not cells), and a deterministic policy dies at identical
   step counts for non-budget reasons, so clocks must never decide expiry. The remaining
   re-tests are non-move keys and clicks tested per state: the planner must predict those too.
+- 2026-09-18 (owner's first-contact play of ls20 L1-L5, `docs/HUMAN_PLAY.md`) — Three things a
+  human does that the agent does not. (1) Goal by similarity: a region that changes under our
+  actions (the bottom-left panel) resembles a static region (the top box); the hypothesis
+  "make them equal" follows from the resemblance, not from a win. (2) Tools are property
+  dials: touching an object changes a property of the avatar shown in the panel (orientation,
+  colour); an effect model keyed by object signature captures exactly that. (3) Rules are
+  free after level 1: zero actions on known rules, about two per new mechanic, the rest is
+  navigation with an energy check. Level 1 cost the human about one touch per object plus
+  the walk; ours costs hundreds because every touch is re-tested per state. The
+  predicted-state planner plus a "make region A equal region B" hypothesis type is the direct
+  translation of this play.
