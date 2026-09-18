@@ -1,0 +1,1100 @@
+[
+  {
+    "game_id": "ar25",
+    "split": "holdout",
+    "human_baseline": [
+      32,
+      50,
+      75,
+      37,
+      89,
+      159,
+      233,
+      73
+    ],
+    "available_actions": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7
+    ],
+    "win_levels": 8,
+    "first_frame": {
+      "colours": 6,
+      "background": 9,
+      "background_share": 0.89,
+      "objects": 12,
+      "small_objects": 6,
+      "hollow_frames": 3,
+      "line_objects": 2,
+      "rare_signatures": 1
+    },
+    "avatar_known_at": 2,
+    "avatar_vectors": {
+      "1": [
+        -3,
+        0
+      ],
+      "2": [
+        3,
+        0
+      ],
+      "3": [
+        0,
+        -3
+      ],
+      "4": [
+        0,
+        3
+      ]
+    },
+    "mask_cells": 64,
+    "multi_frame_steps": 0,
+    "levels_in_probe": 0,
+    "states": 14
+  },
+  {
+    "game_id": "bp35",
+    "split": "holdout",
+    "human_baseline": [
+      21,
+      48,
+      44,
+      38,
+      33,
+      87,
+      86,
+      131,
+      163
+    ],
+    "available_actions": [
+      3,
+      4,
+      6,
+      7
+    ],
+    "win_levels": 9,
+    "first_frame": {
+      "colours": 8,
+      "background": 5,
+      "background_share": 0.46,
+      "objects": 191,
+      "small_objects": 181,
+      "hollow_frames": 8,
+      "line_objects": 1,
+      "rare_signatures": 3
+    },
+    "avatar_known_at": 19,
+    "avatar_vectors": {},
+    "mask_cells": 138,
+    "multi_frame_steps": 60,
+    "levels_in_probe": 0,
+    "states": 10
+  },
+  {
+    "game_id": "cd82",
+    "split": "holdout",
+    "human_baseline": [
+      55,
+      8,
+      41,
+      21,
+      23,
+      23
+    ],
+    "available_actions": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6
+    ],
+    "win_levels": 6,
+    "first_frame": {
+      "colours": 6,
+      "background": 5,
+      "background_share": 0.79,
+      "objects": 13,
+      "small_objects": 5,
+      "hollow_frames": 6,
+      "line_objects": 1,
+      "rare_signatures": 4
+    },
+    "avatar_known_at": null,
+    "avatar_vectors": {},
+    "mask_cells": 64,
+    "multi_frame_steps": 10,
+    "levels_in_probe": 0,
+    "states": 20
+  },
+  {
+    "game_id": "cn04",
+    "split": "dev",
+    "human_baseline": [
+      29,
+      54,
+      85,
+      300,
+      208,
+      113
+    ],
+    "available_actions": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6
+    ],
+    "win_levels": 6,
+    "first_frame": {
+      "colours": 5,
+      "background": 10,
+      "background_share": 0.92,
+      "objects": 7,
+      "small_objects": 4,
+      "hollow_frames": 2,
+      "line_objects": 1,
+      "rare_signatures": 0
+    },
+    "avatar_known_at": 2,
+    "avatar_vectors": {
+      "1": [
+        -3,
+        0
+      ],
+      "2": [
+        3,
+        0
+      ],
+      "3": [
+        0,
+        -3
+      ],
+      "4": [
+        0,
+        3
+      ]
+    },
+    "mask_cells": 59,
+    "multi_frame_steps": 0,
+    "levels_in_probe": 0,
+    "states": 20
+  },
+  {
+    "game_id": "dc22",
+    "split": "holdout",
+    "human_baseline": [
+      59,
+      102,
+      67,
+      98,
+      324,
+      578
+    ],
+    "available_actions": [
+      1,
+      2,
+      3,
+      4,
+      6
+    ],
+    "win_levels": 6,
+    "first_frame": {
+      "colours": 10,
+      "background": 4,
+      "background_share": 0.31,
+      "objects": 35,
+      "small_objects": 24,
+      "hollow_frames": 8,
+      "line_objects": 1,
+      "rare_signatures": 5
+    },
+    "avatar_known_at": 5,
+    "avatar_vectors": {
+      "1": [
+        -2,
+        0
+      ],
+      "2": [
+        2,
+        0
+      ],
+      "3": [
+        0,
+        -2
+      ],
+      "4": [
+        0,
+        2
+      ]
+    },
+    "mask_cells": 64,
+    "multi_frame_steps": 2,
+    "levels_in_probe": 0,
+    "states": 12
+  },
+  {
+    "game_id": "ft09",
+    "split": "dev",
+    "human_baseline": [
+      43,
+      12,
+      23,
+      28,
+      65,
+      37
+    ],
+    "available_actions": [
+      6
+    ],
+    "win_levels": 6,
+    "first_frame": {
+      "colours": 7,
+      "background": 5,
+      "background_share": 0.53,
+      "objects": 64,
+      "small_objects": 26,
+      "hollow_frames": 5,
+      "line_objects": 1,
+      "rare_signatures": 1
+    },
+    "avatar_known_at": null,
+    "avatar_vectors": {},
+    "mask_cells": 64,
+    "multi_frame_steps": 51,
+    "levels_in_probe": 0,
+    "states": 2
+  },
+  {
+    "game_id": "g50t",
+    "split": "dev",
+    "human_baseline": [
+      78,
+      175,
+      179,
+      230,
+      96,
+      54,
+      67
+    ],
+    "available_actions": [
+      1,
+      2,
+      3,
+      4,
+      5
+    ],
+    "win_levels": 7,
+    "first_frame": {
+      "colours": 5,
+      "background": 0,
+      "background_share": 0.73,
+      "objects": 10,
+      "small_objects": 5,
+      "hollow_frames": 5,
+      "line_objects": 1,
+      "rare_signatures": 5
+    },
+    "avatar_known_at": 8,
+    "avatar_vectors": {
+      "2": [
+        6,
+        0
+      ],
+      "3": [
+        0,
+        -6
+      ],
+      "4": [
+        0,
+        6
+      ]
+    },
+    "mask_cells": 64,
+    "multi_frame_steps": 43,
+    "levels_in_probe": 0,
+    "states": 17
+  },
+  {
+    "game_id": "ka59",
+    "split": "dev",
+    "human_baseline": [
+      28,
+      109,
+      51,
+      51,
+      33,
+      132,
+      326
+    ],
+    "available_actions": [
+      1,
+      2,
+      3,
+      4,
+      6
+    ],
+    "win_levels": 7,
+    "first_frame": {
+      "colours": 7,
+      "background": 2,
+      "background_share": 0.79,
+      "objects": 14,
+      "small_objects": 10,
+      "hollow_frames": 6,
+      "line_objects": 1,
+      "rare_signatures": 5
+    },
+    "avatar_known_at": 5,
+    "avatar_vectors": {
+      "1": [
+        -3,
+        0
+      ],
+      "2": [
+        3,
+        0
+      ],
+      "3": [
+        0,
+        -3
+      ],
+      "4": [
+        0,
+        3
+      ]
+    },
+    "mask_cells": 64,
+    "multi_frame_steps": 1,
+    "levels_in_probe": 0,
+    "states": 17
+  },
+  {
+    "game_id": "lf52",
+    "split": "holdout",
+    "human_baseline": [
+      32,
+      81,
+      60,
+      71,
+      205,
+      148,
+      244,
+      109,
+      164,
+      225
+    ],
+    "available_actions": [
+      1,
+      2,
+      3,
+      4,
+      6,
+      7
+    ],
+    "win_levels": 10,
+    "first_frame": {
+      "colours": 6,
+      "background": 10,
+      "background_share": 0.63,
+      "objects": 59,
+      "small_objects": 54,
+      "hollow_frames": 8,
+      "line_objects": 2,
+      "rare_signatures": 0
+    },
+    "avatar_known_at": null,
+    "avatar_vectors": {},
+    "mask_cells": 0,
+    "multi_frame_steps": 60,
+    "levels_in_probe": 0,
+    "states": 60
+  },
+  {
+    "game_id": "lp85",
+    "split": "dev",
+    "human_baseline": [
+      17,
+      38,
+      31,
+      16,
+      41,
+      60,
+      26,
+      159
+    ],
+    "available_actions": [
+      6
+    ],
+    "win_levels": 8,
+    "first_frame": {
+      "colours": 11,
+      "background": 4,
+      "background_share": 0.48,
+      "objects": 37,
+      "small_objects": 32,
+      "hollow_frames": 3,
+      "line_objects": 1,
+      "rare_signatures": 1
+    },
+    "avatar_known_at": null,
+    "avatar_vectors": {},
+    "mask_cells": 64,
+    "multi_frame_steps": 1,
+    "levels_in_probe": 1,
+    "states": 1
+  },
+  {
+    "game_id": "ls20",
+    "split": "dev",
+    "human_baseline": [
+      22,
+      123,
+      73,
+      84,
+      96,
+      192,
+      186
+    ],
+    "available_actions": [
+      1,
+      2,
+      3,
+      4
+    ],
+    "win_levels": 7,
+    "first_frame": {
+      "colours": 9,
+      "background": 4,
+      "background_share": 0.64,
+      "objects": 19,
+      "small_objects": 12,
+      "hollow_frames": 5,
+      "line_objects": 1,
+      "rare_signatures": 8
+    },
+    "avatar_known_at": 7,
+    "avatar_vectors": {
+      "1": [
+        -5,
+        0
+      ],
+      "2": [
+        5,
+        0
+      ],
+      "3": [
+        0,
+        -5
+      ],
+      "4": [
+        0,
+        5
+      ]
+    },
+    "mask_cells": 84,
+    "multi_frame_steps": 2,
+    "levels_in_probe": 1,
+    "states": 35
+  },
+  {
+    "game_id": "m0r0",
+    "split": "dev",
+    "human_baseline": [
+      30,
+      111,
+      203,
+      26,
+      500,
+      237
+    ],
+    "available_actions": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6
+    ],
+    "win_levels": 6,
+    "first_frame": {
+      "colours": 4,
+      "background": 5,
+      "background_share": 0.35,
+      "objects": 4,
+      "small_objects": 0,
+      "hollow_frames": 2,
+      "line_objects": 0,
+      "rare_signatures": 0
+    },
+    "avatar_known_at": 2,
+    "avatar_vectors": {
+      "1": [
+        -5,
+        0
+      ],
+      "2": [
+        5,
+        0
+      ]
+    },
+    "mask_cells": 0,
+    "multi_frame_steps": 0,
+    "levels_in_probe": 0,
+    "states": 45
+  },
+  {
+    "game_id": "r11l",
+    "split": "dev",
+    "human_baseline": [
+      22,
+      33,
+      51,
+      26,
+      52,
+      49
+    ],
+    "available_actions": [
+      6
+    ],
+    "win_levels": 6,
+    "first_frame": {
+      "colours": 7,
+      "background": 5,
+      "background_share": 0.81,
+      "objects": 31,
+      "small_objects": 25,
+      "hollow_frames": 7,
+      "line_objects": 1,
+      "rare_signatures": 4
+    },
+    "avatar_known_at": null,
+    "avatar_vectors": {},
+    "mask_cells": 64,
+    "multi_frame_steps": 54,
+    "levels_in_probe": 1,
+    "states": 30
+  },
+  {
+    "game_id": "re86",
+    "split": "dev",
+    "human_baseline": [
+      26,
+      42,
+      86,
+      108,
+      189,
+      139,
+      424,
+      241
+    ],
+    "available_actions": [
+      1,
+      2,
+      3,
+      4,
+      5
+    ],
+    "win_levels": 8,
+    "first_frame": {
+      "colours": 7,
+      "background": 5,
+      "background_share": 0.94,
+      "objects": 24,
+      "small_objects": 22,
+      "hollow_frames": 9,
+      "line_objects": 5,
+      "rare_signatures": 2
+    },
+    "avatar_known_at": 2,
+    "avatar_vectors": {
+      "1": [
+        -3,
+        0
+      ],
+      "3": [
+        0,
+        -3
+      ],
+      "4": [
+        0,
+        3
+      ]
+    },
+    "mask_cells": 64,
+    "multi_frame_steps": 0,
+    "levels_in_probe": 0,
+    "states": 35
+  },
+  {
+    "game_id": "s5i5",
+    "split": "dev",
+    "human_baseline": [
+      20,
+      89,
+      106,
+      54,
+      162,
+      38,
+      86,
+      83
+    ],
+    "available_actions": [
+      6
+    ],
+    "win_levels": 8,
+    "first_frame": {
+      "colours": 7,
+      "background": 5,
+      "background_share": 0.92,
+      "objects": 28,
+      "small_objects": 19,
+      "hollow_frames": 8,
+      "line_objects": 1,
+      "rare_signatures": 5
+    },
+    "avatar_known_at": null,
+    "avatar_vectors": {},
+    "mask_cells": 64,
+    "multi_frame_steps": 0,
+    "levels_in_probe": 0,
+    "states": 20
+  },
+  {
+    "game_id": "sb26",
+    "split": "dev",
+    "human_baseline": [
+      18,
+      28,
+      18,
+      19,
+      31,
+      23,
+      58,
+      18
+    ],
+    "available_actions": [
+      5,
+      6,
+      7
+    ],
+    "win_levels": 8,
+    "first_frame": {
+      "colours": 10,
+      "background": 4,
+      "background_share": 0.89,
+      "objects": 24,
+      "small_objects": 17,
+      "hollow_frames": 6,
+      "line_objects": 1,
+      "rare_signatures": 5
+    },
+    "avatar_known_at": null,
+    "avatar_vectors": {},
+    "mask_cells": 0,
+    "multi_frame_steps": 60,
+    "levels_in_probe": 0,
+    "states": 60
+  },
+  {
+    "game_id": "sc25",
+    "split": "dev",
+    "human_baseline": [
+      36,
+      6,
+      32,
+      83,
+      143,
+      50
+    ],
+    "available_actions": [
+      1,
+      2,
+      3,
+      4,
+      6
+    ],
+    "win_levels": 6,
+    "first_frame": {
+      "colours": 8,
+      "background": 5,
+      "background_share": 0.84,
+      "objects": 22,
+      "small_objects": 17,
+      "hollow_frames": 5,
+      "line_objects": 1,
+      "rare_signatures": 4
+    },
+    "avatar_known_at": 8,
+    "avatar_vectors": {
+      "3": [
+        0,
+        -4
+      ],
+      "4": [
+        0,
+        4
+      ]
+    },
+    "mask_cells": 128,
+    "multi_frame_steps": 5,
+    "levels_in_probe": 0,
+    "states": 30
+  },
+  {
+    "game_id": "sk48",
+    "split": "dev",
+    "human_baseline": [
+      61,
+      177,
+      101,
+      103,
+      230,
+      181,
+      125,
+      92
+    ],
+    "available_actions": [
+      1,
+      2,
+      3,
+      4,
+      6,
+      7
+    ],
+    "win_levels": 8,
+    "first_frame": {
+      "colours": 10,
+      "background": 5,
+      "background_share": 0.59,
+      "objects": 45,
+      "small_objects": 40,
+      "hollow_frames": 6,
+      "line_objects": 1,
+      "rare_signatures": 7
+    },
+    "avatar_known_at": 10,
+    "avatar_vectors": {
+      "1": [
+        -6,
+        0
+      ],
+      "2": [
+        6,
+        0
+      ]
+    },
+    "mask_cells": 64,
+    "multi_frame_steps": 36,
+    "levels_in_probe": 0,
+    "states": 22
+  },
+  {
+    "game_id": "sp80",
+    "split": "dev",
+    "human_baseline": [
+      39,
+      58,
+      25,
+      148,
+      96,
+      152
+    ],
+    "available_actions": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6
+    ],
+    "win_levels": 6,
+    "first_frame": {
+      "colours": 8,
+      "background": 12,
+      "background_share": 0.86,
+      "objects": 8,
+      "small_objects": 3,
+      "hollow_frames": 2,
+      "line_objects": 1,
+      "rare_signatures": 3
+    },
+    "avatar_known_at": 5,
+    "avatar_vectors": {
+      "1": [
+        -4,
+        0
+      ],
+      "2": [
+        4,
+        0
+      ],
+      "3": [
+        0,
+        -4
+      ],
+      "4": [
+        0,
+        4
+      ]
+    },
+    "mask_cells": 64,
+    "multi_frame_steps": 4,
+    "levels_in_probe": 1,
+    "states": 26
+  },
+  {
+    "game_id": "su15",
+    "split": "dev",
+    "human_baseline": [
+      22,
+      42,
+      26,
+      115,
+      36,
+      31,
+      8,
+      40,
+      41
+    ],
+    "available_actions": [
+      6,
+      7
+    ],
+    "win_levels": 9,
+    "first_frame": {
+      "colours": 6,
+      "background": 5,
+      "background_share": 0.8,
+      "objects": 27,
+      "small_objects": 24,
+      "hollow_frames": 2,
+      "line_objects": 1,
+      "rare_signatures": 3
+    },
+    "avatar_known_at": null,
+    "avatar_vectors": {},
+    "mask_cells": 64,
+    "multi_frame_steps": 51,
+    "levels_in_probe": 0,
+    "states": 8
+  },
+  {
+    "game_id": "tn36",
+    "split": "holdout",
+    "human_baseline": [
+      32,
+      72,
+      26,
+      40,
+      30,
+      55,
+      62
+    ],
+    "available_actions": [
+      6
+    ],
+    "win_levels": 7,
+    "first_frame": {
+      "colours": 7,
+      "background": 5,
+      "background_share": 0.74,
+      "objects": 48,
+      "small_objects": 45,
+      "hollow_frames": 4,
+      "line_objects": 1,
+      "rare_signatures": 4
+    },
+    "avatar_known_at": null,
+    "avatar_vectors": {},
+    "mask_cells": 61,
+    "multi_frame_steps": 5,
+    "levels_in_probe": 1,
+    "states": 19
+  },
+  {
+    "game_id": "tr87",
+    "split": "holdout",
+    "human_baseline": [
+      54,
+      58,
+      40,
+      45,
+      71,
+      146
+    ],
+    "available_actions": [
+      1,
+      2,
+      3,
+      4
+    ],
+    "win_levels": 6,
+    "first_frame": {
+      "colours": 7,
+      "background": 2,
+      "background_share": 0.38,
+      "objects": 64,
+      "small_objects": 44,
+      "hollow_frames": 37,
+      "line_objects": 1,
+      "rare_signatures": 8
+    },
+    "avatar_known_at": 6,
+    "avatar_vectors": {
+      "3": [
+        0,
+        -7
+      ],
+      "4": [
+        0,
+        7
+      ]
+    },
+    "mask_cells": 64,
+    "multi_frame_steps": 0,
+    "levels_in_probe": 0,
+    "states": 28
+  },
+  {
+    "game_id": "tu93",
+    "split": "dev",
+    "human_baseline": [
+      19,
+      16,
+      34,
+      42,
+      123,
+      80,
+      14,
+      23,
+      111
+    ],
+    "available_actions": [
+      1,
+      2,
+      3,
+      4
+    ],
+    "win_levels": 9,
+    "first_frame": {
+      "colours": 7,
+      "background": 5,
+      "background_share": 0.85,
+      "objects": 66,
+      "small_objects": 65,
+      "hollow_frames": 1,
+      "line_objects": 1,
+      "rare_signatures": 4
+    },
+    "avatar_known_at": 9,
+    "avatar_vectors": {
+      "1": [
+        6,
+        0
+      ],
+      "2": [
+        -6,
+        0
+      ],
+      "3": [
+        0,
+        6
+      ],
+      "4": [
+        0,
+        -6
+      ]
+    },
+    "mask_cells": 64,
+    "multi_frame_steps": 37,
+    "levels_in_probe": 0,
+    "states": 19
+  },
+  {
+    "game_id": "vc33",
+    "split": "dev",
+    "human_baseline": [
+      7,
+      18,
+      44,
+      61,
+      131,
+      34,
+      152
+    ],
+    "available_actions": [
+      6
+    ],
+    "win_levels": 7,
+    "first_frame": {
+      "colours": 7,
+      "background": 3,
+      "background_share": 0.63,
+      "objects": 11,
+      "small_objects": 6,
+      "hollow_frames": 3,
+      "line_objects": 1,
+      "rare_signatures": 5
+    },
+    "avatar_known_at": null,
+    "avatar_vectors": {},
+    "mask_cells": 64,
+    "multi_frame_steps": 1,
+    "levels_in_probe": 1,
+    "states": 10
+  },
+  {
+    "game_id": "wa30",
+    "split": "dev",
+    "human_baseline": [
+      71,
+      119,
+      183,
+      98,
+      368,
+      68,
+      79,
+      442,
+      415
+    ],
+    "available_actions": [
+      1,
+      2,
+      3,
+      4,
+      5
+    ],
+    "win_levels": 9,
+    "first_frame": {
+      "colours": 7,
+      "background": 1,
+      "background_share": 0.96,
+      "objects": 11,
+      "small_objects": 8,
+      "hollow_frames": 4,
+      "line_objects": 2,
+      "rare_signatures": 2
+    },
+    "avatar_known_at": 21,
+    "avatar_vectors": {
+      "1": [
+        -4,
+        0
+      ],
+      "2": [
+        3,
+        0
+      ]
+    },
+    "mask_cells": 64,
+    "multi_frame_steps": 0,
+    "levels_in_probe": 0,
+    "states": 40
+  }
+]
