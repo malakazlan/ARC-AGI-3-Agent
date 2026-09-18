@@ -8,6 +8,7 @@ from arc3.perception.grid import (
     countdown_mask_from_signatures,
     frame_diff,
     segment_objects,
+    shape_key,
     state_hash,
     volatility_mask,
 )
@@ -21,6 +22,7 @@ __all__ = [
     "countdown_mask_from_signatures",
     "frame_diff",
     "segment_objects",
+    "shape_key",
     "state_hash",
     "volatility_mask",
     "Translation",

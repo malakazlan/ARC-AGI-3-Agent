@@ -124,3 +124,29 @@ def test_predicted_position_after_a_known_move():
     cells = model.avatar_cells(frames[-1])
     moved = model.predict_cells(cells, 4)
     assert moved == {(y, x + 1) for (y, x) in cells}
+
+
+def test_uniform_block_moving_one_cell_is_not_confused_with_its_own_width():
+    a, b = grid8(), grid8()
+    a[3, 1:5] = 5                    # a 1x4 bar of one colour
+    b[3, 2:6] = 5                    # moved right by one
+    tr = find_translation(a, b)
+    assert tr is not None and (tr.dy, tr.dx) == (0, 1)
+    assert set(tr.cells) == {(3, 1), (3, 2), (3, 3), (3, 4)}
+
+
+def test_two_colour_avatar_is_one_translation_even_when_segmented_as_two_objects():
+    a, b = grid8(), grid8()
+    a[2, 2] = 1; a[2, 3] = 2; a[3, 2] = 2; a[3, 3] = 1
+    b[3, 2] = 1; b[3, 3] = 2; b[4, 2] = 2; b[4, 3] = 1
+    tr = find_translation(a, b)
+    assert tr is not None and (tr.dy, tr.dx) == (1, 0) and len(tr.cells) == 4
+
+
+def test_static_objects_elsewhere_do_not_disturb_the_translation():
+    a, b = grid8(), grid8()
+    a[0, 0:3] = 7; b[0, 0:3] = 7     # a static wall
+    a[6, 6] = 9; b[6, 6] = 9         # a static dot
+    a[3, 1:5] = 5; b[3, 2:6] = 5
+    tr = find_translation(a, b)
+    assert tr is not None and (tr.dy, tr.dx) == (0, 1) and tr.explained >= 0.99

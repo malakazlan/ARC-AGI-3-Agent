@@ -187,6 +187,18 @@ def countdown_mask(attempts: list[list[np.ndarray]],
     return countdown_mask_from_signatures(signatures, attempts[keep[0]][0].shape)
 
 
+def shape_key(obj: GridObject) -> str:
+    """Position-free shape: bbox size plus the occupancy pattern (exact up to 64 cells)."""
+    y0, x0, y1, x1 = obj.bbox
+    h, w = y1 - y0 + 1, x1 - x0 + 1
+    if obj.size > 64:
+        return f"{h}x{w}"
+    bits = ["0"] * (h * w)
+    for y, x in obj.cells:
+        bits[(y - y0) * w + (x - x0)] = "1"
+    return f"{h}x{w}:{int(''.join(bits), 2):x}"
+
+
 def state_hash(grid: np.ndarray, mask: np.ndarray | None = None) -> str:
     """Stable key for a grid. Masked cells are replaced by a sentinel so they never matter."""
     keyed = grid.astype(np.int8, copy=True)
