@@ -20,6 +20,7 @@ Variants (each mirrors something seen on the real ls20):
                    cols 0-4) that loses a cell every N/5 actions; an action on an empty bar
                    restarts the level in place with a flash (no GAME_OVER), like ls20. Refill
                    cells of the bar's colour at (6, 9) and (0, 5) restore it.
+  consumable_refills  a refill cell vanishes once used (ls20 level 3); a restart brings it back
   levels           2: level 2 keeps the rule, moves the target and the rotator
 """
 from __future__ import annotations
@@ -49,7 +50,7 @@ class DisplayToy:
     def __init__(self, exit_in_target: bool = False, rotator_walkable: bool = False,
                  deep_target: bool = False, compound_rotator: bool = False,
                  colour_dial: bool = False, bar: bool = False, levels: int = 1,
-                 energy: int | None = None) -> None:
+                 energy: int | None = None, consumable_refills: bool = False) -> None:
         self.exit_in_target = exit_in_target or deep_target
         self.rotator_walkable = rotator_walkable
         self.deep_target = deep_target
@@ -58,6 +59,8 @@ class DisplayToy:
         self.bar = bar
         self.energy = energy
         self.energy_left = energy
+        self.consumable_refills = consumable_refills
+        self.refills_left: set[tuple[int, int]] = set(REFILL_CELLS)
         self.under_avatar = 0
         self.levels = levels
         self.levels_completed = 0
@@ -133,6 +136,7 @@ class DisplayToy:
             g[10, 6:6 + self.bar_left] = 3
         if self.energy is not None:
             self.energy_left = self.energy
+            self.refills_left = set(REFILL_CELLS)
             for cell in REFILL_CELLS:
                 g[cell] = BAR_COLOUR
             self._draw_energy(g)
@@ -216,10 +220,13 @@ class DisplayToy:
         cell = int(self.grid[ny, nx])
         ty0, tx0, ty1, tx1 = self._target_box()
         in_target = ty0 <= ny <= ty1 and tx0 <= nx <= tx1
-        if self.energy is not None and (ny, nx) in REFILL_CELLS:
+        if self.energy is not None and (ny, nx) in self.refills_left:
             self.refills += 1
             self.energy_left = self.energy
             self._draw_energy(self.grid)
+            if self.consumable_refills:
+                self.refills_left.discard((ny, nx))
+                self.grid[ny, nx] = 0
             return self.observe()
         if cell in ROTATOR_COLOURS:              # rotator: touch (and step onto it if walkable)
             self.touches += 1

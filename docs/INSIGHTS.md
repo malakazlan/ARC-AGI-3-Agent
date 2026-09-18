@@ -178,3 +178,24 @@ Implementation details belong in DECISIONS.md, not here. Mark unverified beliefs
   uniform before 4, two frames became equal before 2 (vc33), a class count dropped before 1.
   The waste on g50t (90% bar-only) is not a rule problem: the agent ping-pongs between two
   positions because it has no goal, which is the template problem again.
+- 2026-09-18 (click games, ft09 and lp85 autopsies) - Two ways a click game's frontier
+  collapses while the level is unexplored. (1) A wrong generalisation: the effect model kept
+  only the last few observations per object signature, so twelve legend tiles that ignore
+  clicks taught it that the eight playable tiles of the same colour and shape are no-ops;
+  every playable click became a predicted self-loop, the frontier was "exhausted" after 5
+  states and 80% of the budget went to random clicks on the background. A generalisation
+  must die on its first contradiction (KWIK) and be verified once before it is trusted: a
+  contradicted signature now predicts per instance, the bar is masked out of the recorded
+  effect, and predicted edges are executed before the agent ever clicks at random. ft09: 5 ->
+  700 states and level 1 won on every seed. (2) A candidate cap by size: 74 objects and a
+  64-click cap ordered small-first dropped the only two arrow buttons on lp85 level 2; the
+  cap now keeps one instance of every signature. The rule behind both: never let a shortcut
+  remove the last untested representative of a class.
+- 2026-09-18 (same build, the ablation) - Two cautions. The bar mask is a trade, not a free
+  win: su15's "gravity" clicks change nothing unless something movable is within reach, so a
+  no-op rule over the signature is wrong there (6/6 -> 2/6 before verify-first, 4/6 after)
+  while s5i5 and ft09 gain; the fix is context in the click signature, not dropping the mask.
+  And candidate order below the cap is not free either: reordering vc33's four buttons
+  changed its level-2 walk from a median of 40 actions to 190 over 12 seeds, without any
+  code path that should depend on order. Treat every ordering change as a behavioural change
+  and measure it on 6+ seeds.

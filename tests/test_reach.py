@@ -45,3 +45,14 @@ def test_reach_goal_carries_to_the_next_level():
     assert game.levels_completed == 2
     level1 = brain.policy.store.level_paths[0]
     assert game.steps - len(level1) <= 40
+
+
+def test_explorer_learns_a_conveyor_and_the_policy_rides_it():
+    """The target sits behind the wall; a strip at the wall's gap carries the avatar to the
+    far side. After one ride the explorer knows the transport and the win path uses it."""
+    game = ReachToy(decoys=False, conveyor=((6, 9), (4, 9)))
+    brain, log = run(game, steps=150)
+    ex = brain.policy.explorer
+    assert ex.diagnostics.get("transports"), "the ride was not learned as a transport"
+    assert game.levels_completed == 1
+    assert ex.diagnostics["planner_resets"] == 0

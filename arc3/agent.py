@@ -134,6 +134,11 @@ class Orchestrator:
                 use_effects=config.effects,
                 dial_cap=config.dial_cap,
                 breadth_first=config.breadth_first,
+                click_mask=config.click_mask,
+                click_split=config.click_split,
+                verify_first=config.verify_first,
+                verify_predictions=config.verify_predictions,
+                diverse_clicks=config.diverse_clicks,
             )
         return self._random_policy
 

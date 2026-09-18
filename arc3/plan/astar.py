@@ -21,13 +21,16 @@ def unknown_ahead(grid: np.ndarray, cells: Cells, keys: dict[int, tuple[int, int
 
 def plan_moves(grid: np.ndarray, start: Cells, keys: dict[int, tuple[int, int]], model: PassabilityModel,
                goal: Goal | None, max_positions: int = MAX_POSITIONS,
-               forbidden: set[tuple[Cells, int]] | None = None) -> list[int] | None:
+               forbidden: set[tuple[Cells, int]] | None = None,
+               transports: dict[Cells, Cells] | None = None) -> list[int] | None:
     """Keys to press from `start` to reach `goal` (or, with goal=None, the nearest position
     from which some key's outcome is unknown). [] when already there, None when unreachable
     through known-passable cells. `forbidden` holds (position, key) presses that ended the
-    game before; they are never planned again."""
+    game before; they are never planned again. `transports` maps a landing position to where
+    the game carries the avatar from there (a conveyor, a portal), at no extra cost."""
     origin = start
     forbidden = forbidden or set()
+    transports = transports or {}
 
     def is_goal(cells: Cells) -> bool:
         if goal is not None:
@@ -46,7 +49,7 @@ def plan_moves(grid: np.ndarray, start: Cells, keys: dict[int, tuple[int, int]],
             pred = predict_move(grid, cells, vec, model, origin)
             if pred is None or pred[0] != "moved":
                 continue
-            nxt = pred[1]
+            nxt = transports.get(pred[1], pred[1])
             if nxt in parent:
                 continue
             parent[nxt] = (cells, key)

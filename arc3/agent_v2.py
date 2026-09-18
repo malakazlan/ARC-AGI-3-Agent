@@ -20,6 +20,8 @@ from arc3.config import Arc3Config
 from arc3.explore import GraphExplorer
 from arc3.perception import GridObject, segment_objects, shape_key
 from arc3.plan import plan_moves
+from arc3.world_model import predict_move
+from arc3.plan.route import Stop, cell_route_length, plan_route
 from arc3.rules import Goal, RuleStore, display_pairs, extract_events, match_progress, match_report
 from arc3.types import ActionChoice, ActionKey, Observation
 from arc3.world_model import swept_cells
@@ -31,6 +33,11 @@ TOUCH_LIMIT = 12    # touches of one dial before the hypothesis is doubted
 ENTRY_LIMIT = 6     # presses into the target display before it is dismissed as the exit
 ICON_SIDE = 4       # pieces of a multi-colour icon fit in a box smaller than this
 Cells = frozenset[tuple[int, int]]
+
+
+def _centre(bbox: tuple) -> tuple[int, int]:
+    y0, x0, y1, x1 = bbox
+    return ((y0 + y1) // 2, (x0 + x1) // 2)
 
 
 def _sig(o: GridObject) -> tuple:
@@ -46,13 +53,16 @@ class RulePolicy:
             use_action_prior=config.action_prior, use_planner=config.planner,
             max_mismatches=config.planner_max_mismatches, use_effects=config.effects,
             dial_cap=config.dial_cap, breadth_first=config.breadth_first,
+            click_mask=config.click_mask, click_split=config.click_split, verify_first=config.verify_first,
+            verify_predictions=config.verify_predictions, diverse_clicks=config.diverse_clicks,
         )
         self.store = RuleStore()
         self.mode = "discover"
         self.probed: set[tuple] = set()          # signatures already touched this level
         self.tried_exits: set[tuple] = set()
         self.plan: list[int] = []
-        self.plan_goal: str = ""
+        self.plan_goal: tuple | str = ""
+        self.walk_expect: Cells | None = None    # where the last walk step should have left the avatar
         self.pending_touch: tuple[tuple, int, Cells] | None = None  # (signature, key, cells) just pressed
         self.tool_cells: dict[tuple, Cells] = {}  # where each touched tool was (it may be under us)
         self.pending_exit: Cells | None = None    # avatar cells before a press into the display
@@ -300,12 +310,13 @@ class RulePolicy:
                 return None
             # the dial for a property that still mismatches; none known: probe something new
             wanted = [p for p, ok in self.last_report.items() if not ok]
-            tool = None
+            dials: list[GridObject] = []
             for sig, t in self.store.tools.items():
                 if t.kind == "dial" and t.params.get("prop") in wanted:
-                    tool = self._find_tool(grid, sig)
-                    if tool is not None:
-                        break
+                    found = self._find_tool(grid, sig)
+                    if found is not None:
+                        dials.append(found)
+            tool = dials[0] if dials else None
             if tool is None:
                 probe, had_candidates = self._probe_unknown(observation)
                 if probe is not None:
@@ -314,7 +325,9 @@ class RulePolicy:
                     return None   # something to probe, just not reachable from here: let the explorer move
                 self._demote()
                 return None
-            choice = self._go(observation, tool, purpose="dial")
+            choice = self._follow_route(observation, dials, pair)
+            if choice is None:
+                choice = self._go(observation, tool, purpose="dial")
             if choice is not None and choice.reason.startswith("rules: touch dial"):
                 self.touches += 1
             return choice
@@ -334,6 +347,72 @@ class RulePolicy:
                 return choice
         self._demote()
         return None
+
+    def _follow_route(self, observation: Observation, dials: list[GridObject], pair) -> ActionChoice | None:
+        """One step along the cheapest feasible order of the dials, the display exit and the
+        refills (design v2 section 6). None when no route fits or the first leg is unreachable:
+        the caller falls back to the greedy leg-by-leg rule."""
+        grid = observation.grid
+        stops = [Stop(f"dial{i}", _centre(d.bbox)) for i, d in enumerate(dials)]
+        if not self.display_exit_tried:
+            stops.append(Stop("exit", _centre(pair.static_box), final=True))
+        route = self._route(observation, stops)
+        if not route:
+            return None
+        self.diagnostics["route_steps"] = self.diagnostics.get("route_steps", 0) + 1
+        first = route[0]
+        if first.name == "refill":
+            for cand in self._refill_candidates(grid):
+                if _centre(cand.bbox) == first.at:
+                    self.diagnostics["route_refills"] = self.diagnostics.get("route_refills", 0) + 1
+                    return self._touch_or_walk(observation, cand, purpose="refill")
+            return None
+        if first.name.startswith("dial"):
+            return self._touch_or_walk(observation, dials[int(first.name[4:])], purpose="dial")
+        return None
+
+    def _route(self, observation: Observation, stops: list[Stop]) -> list[Stop] | None:
+        grid = observation.grid
+        ex = self.explorer
+        avatar = ex.avatar.avatar_cells(grid) if ex.avatar else frozenset()
+        if not avatar:
+            return None
+        start = (int(round(sum(y for y, _ in avatar) / len(avatar))),
+                 int(round(sum(x for _, x in avatar) / len(avatar))))
+        vectors = ex._known_vectors()
+        step = max(1, max((abs(v[0]) + abs(v[1]) for v in vectors.values()), default=1))
+        walk = self._walkable(grid)
+        for (y, x) in avatar:
+            walk[y, x] = True
+        cache: dict[tuple, int | None] = {}
+
+        def dist(a, b):
+            if (a, b) not in cache:
+                cache[(a, b)] = cell_route_length(walk, a, b, step)
+            return cache[(a, b)]
+
+        energy = ex.energy
+        budgeted = (energy is not None and energy.capacity and ex.mask_ok(grid) and not self.ambient_rises)
+        if budgeted:
+            rate = max(energy.rate, 1e-6)
+            moves_left = int(energy.remaining(grid) / rate)
+            capacity = max(1, int(energy.capacity / rate))
+            refills = [_centre(o.bbox) for o in self._refill_candidates(grid)]
+        else:
+            moves_left = capacity = 10 ** 6
+            refills = []
+        return plan_route(start, stops, refills, moves_left, capacity, dist)
+
+    def _walkable(self, grid: np.ndarray) -> np.ndarray:
+        """Cells the avatar may stand on: every colour not known to block or kill, minus the bar."""
+        ex = self.explorer
+        walk = np.ones(grid.shape, dtype=bool)
+        for colour in np.unique(grid):
+            if ex.passability.passable(int(colour)) is False or ex.passability.lethal(int(colour)):
+                walk[grid == colour] = False
+        if ex.mask is not None and ex.mask.shape == grid.shape:
+            walk &= ~ex.mask
+        return walk
 
     def _progress(self, grid: np.ndarray, pair) -> float:
         """Match progress, held at its last value while the avatar overlaps a display (the
@@ -663,18 +742,31 @@ class RulePolicy:
                 energy = ex.energy
                 self.energy_before = energy.remaining(grid) if (energy is not None and ex.mask_ok(grid)) else None
                 return ActionChoice(key, None, None, f"rules: touch {purpose} {_sig(target)[:1]} with key {key}")
-        if self.plan and self.plan_goal == (purpose, target.anchor):
+        if self.plan and self.plan_goal == (purpose, target.anchor) and cells == self.walk_expect:
             key = self.plan.pop(0)
+            self.walk_expect = self._landing(grid, cells, vectors.get(key))
             return ActionChoice(key, None, None, f"rules: walk to {purpose} ({len(self.plan)} left)")
+        self.plan = []   # no plan, another goal, or the last step did not land where planned
         path = plan_moves(grid, cells, vectors, ex.passability,
                           goal=lambda c: any(swept_cells(c, v) & target_cells for v in vectors.values()),
-                          forbidden=ex.lethal_moves)
+                          forbidden=ex.lethal_moves, transports=ex.transports)
         if not path:
             return None
         self.plan = list(path)
         self.plan_goal = (purpose, target.anchor)
         key = self.plan.pop(0)
+        self.walk_expect = self._landing(grid, cells, vectors.get(key))
         return ActionChoice(key, None, None, f"rules: walk to {purpose} ({len(self.plan)} left)")
+
+    def _landing(self, grid: np.ndarray, cells: Cells, vec: tuple[int, int] | None) -> Cells | None:
+        """Where a press should leave the avatar, transports included; None when unknown."""
+        if vec is None:
+            return None
+        ex = self.explorer
+        pred = predict_move(grid, cells, vec, ex.passability, cells)
+        if pred is None or pred[0] != "moved":
+            return None
+        return ex.transports.get(pred[1], pred[1])
 
     def _objects(self, grid: np.ndarray, avatar: Cells) -> list[GridObject]:
         """Objects with small touching pieces of different colours merged into one: a two-colour
@@ -721,13 +813,14 @@ class RulePolicy:
         """Rare, small, static objects, nearest to the avatar first."""
         ex = self.explorer
         avatar = ex.avatar.avatar_cells(grid) if ex.avatar else frozenset()
-        objects = self._objects(grid, avatar)
+        mask = ex.mask if (ex.mask is not None and ex.mask.shape == grid.shape) else None
+        objects = [o for o in self._objects(grid, avatar)
+                   if mask is None or not any(mask[y, x] for (y, x) in o.cells)]   # never the bar
         counts: dict[tuple, int] = {}
         for o in objects:
             counts[_sig(o)] = counts.get(_sig(o), 0) + 1
         avatar_sig = ex.avatar.signature if ex.avatar else None
         bar_colour = ex.energy.full_colour if ex.energy is not None else None
-        mask = ex.mask if (ex.mask is not None and ex.mask.shape == grid.shape) else None
         out = []
         for o in objects:
             s = _sig(o)
@@ -735,8 +828,6 @@ class RulePolicy:
                 continue
             if ex.passability.lethal(int(o.color)):
                 continue
-            if mask is not None and any(mask[y, x] for (y, x) in o.cells):
-                continue  # the energy bar itself
             y0, x0, y1, x1 = o.bbox
             if (y1 - y0 + 1) * (x1 - x0 + 1) > o.size and o.size >= 6 and int(o.color) != bar_colour:
                 continue  # hollow: a frame or panel border, not a tool (a bar-coloured ring may refill)

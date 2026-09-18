@@ -50,9 +50,16 @@ class GraphExplorer:
                  use_countdown_mask: bool = True, budget_aware: bool = True,
                  use_action_prior: bool = True, use_planner: bool = True,
                  max_mismatches: int = 3, use_effects: bool = True,
-                 dial_cap: bool = True, breadth_first: bool = True) -> None:
+                 dial_cap: bool = True, breadth_first: bool = True, click_mask: bool = True,
+                 click_split: bool = True, verify_first: bool = True, verify_predictions: bool = True,
+                 diverse_clicks: bool = True) -> None:
         self.dial_cap = dial_cap
         self.breadth_first = breadth_first
+        self.click_mask = click_mask
+        self.verify_first = verify_first
+        self.verify_predictions = verify_predictions
+        self.diverse_clicks = diverse_clicks
+        self.verified_sigs: set[tuple] = set()   # signatures whose click rule predicted right once
         self.rng = rng
         self.max_nodes = max_nodes
         self.max_clicks = max_clicks
@@ -70,10 +77,11 @@ class GraphExplorer:
         self.expected: tuple[str, frozenset] | None = None  # prediction for the pending move
         self.move_plan: list[int] = []
         # effects by signature: game-level facts, survive level changes
-        self.click_effects: ClickEffects | None = ClickEffects() if use_effects else None
+        self.click_effects: ClickEffects | None = ClickEffects(split=click_split) if use_effects else None
         self.key_effects: KeyEffects | None = KeyEffects() if use_effects else None
         self.click_sig: dict[tuple[str, ActionKey], tuple] = {}  # (state key, click) -> object signature
         self.floor: Counter = Counter()  # colours revealed where the avatar used to stand
+        self.transports: dict[Cells, Cells] = {}  # landing position -> where the game carries the avatar
         self.dials = DialModel()  # action classes that cycle a property with a period
         self._last_signatures: dict[ActionKey, tuple] = {}
         self.graph = StateGraph(max_nodes)
@@ -105,7 +113,7 @@ class GraphExplorer:
             "levels_seen": 0, "win_path_lengths": [], "budget_deaths": 0, "mask_cells": 0,
             "budget": None, "graph_rebuilds": 0, "deferred_picks": 0,
             "retests_avoided": 0, "mismatches": 0, "planner_resets": 0, "planned_moves": 0,
-            "avatar_known_at": None, "kill_colours": 0, "effects_avoided": 0, "dial_capped": 0,
+            "avatar_known_at": None, "kill_colours": 0, "effects_avoided": 0, "dial_capped": 0, "verifications": 0,
             "silent_deaths": 0, "mask_carried": 0,
         }
 
@@ -210,6 +218,11 @@ class GraphExplorer:
                             self.passability.vote(int(before[y, x]), "blocks")
                 else:
                     kind = "other"  # moved in an unexpected direction: no votes
+                    landing = frozenset((y + vec[0], x + vec[1]) for (y, x) in old_cells)
+                    if new_cells and new_cells != landing:
+                        # carried beyond the press: a transport from the landing position
+                        self.transports[landing] = frozenset(new_cells)
+                        self.diagnostics["transports"] = len(self.transports)
             elif outcome == "blocked":
                 # the press stopped at the first obstacle along the sweep: blame that footprint
                 for colour in first_obstacle_colours(before, old_cells, vec, self.passability):
@@ -229,9 +242,24 @@ class GraphExplorer:
         if action[0] == COMPLEX_ACTION_ID:
             sig = self.click_sig.get((src, action))
             if sig is not None and self.click_effects is not None:
-                self.click_effects.record(sig, (action[2], action[1]), self.last_grid, grid)
+                had_rule = self.click_effects.global_effect(sig) is not None
+                mask = self.mask if self.click_mask else None
+                if self.click_effects.record(sig, (action[2], action[1]), self.last_grid, grid, mask):
+                    self._forget_predictions(sig)
+                    self.verified_sigs.discard(sig)
+                elif had_rule:
+                    self.verified_sigs.add(sig)   # the rule predicted this outcome: trusted from now on
         elif action[0] not in MOVE_KEYS and self.key_effects is not None:
             self.key_effects.record(action[0], self._avatar_in(self.last_grid), self.last_grid, grid)
+
+    def _forget_predictions(self, sig: tuple) -> None:
+        """A signature's rule was contradicted: its predicted edges are hypotheses no more."""
+        for node in self.graph.nodes.values():
+            stale = [a for a, e in node.tested.items()
+                     if e.predicted and self.click_sig.get((node.key, a)) == sig]
+            for a in stale:
+                del node.tested[a]
+                self.graph.edges -= 1
 
     def _avatar_in(self, grid: np.ndarray) -> frozenset:
         if self.avatar is None or not self.avatar.confident:
@@ -326,7 +354,11 @@ class GraphExplorer:
             sig = self.click_sig.get((key, action))
             if sig is None:
                 return None
-            return self.click_effects.predict(sig, (action[2], action[1]), self.current_grid)
+            pos = (action[2], action[1])
+            if (self.verify_first and sig not in self.verified_sigs
+                    and self.click_effects.instance_effect(sig, pos) is None):
+                return None   # a rule generalised over instances is executed once before it is trusted
+            return self.click_effects.predict(sig, pos, self.current_grid)
         if action[0] not in MOVE_KEYS and self.key_effects is not None:
             return self.key_effects.predict(action[0], self._avatar_in(self.current_grid), self.current_grid)
         return None
@@ -634,8 +666,30 @@ class GraphExplorer:
             _, action = self.plan.pop(0)
             self.diagnostics["plan_steps"] += 1
             return action, f"graph: plan to deferred ({len(self.plan)} more)"
+        verify = self._unverified_prediction(key) if self.verify_predictions else None
+        if verify is not None:
+            self.diagnostics["verifications"] += 1
+            return verify, "graph: verify predicted edge"
         self.diagnostics["exhausted"] += 1
+        node = self.graph.nodes.get(key)
+        if node is not None and node.candidates:
+            pool = node.candidates
+            if self.prior is not None:
+                pool = [a for a in pool if not self.prior.deferred(self.graph.action_class(key, a))]
+            if pool:
+                return self._best(key, pool), "graph: frontier exhausted, re-test"
         return self._random_legal(observation), "graph: frontier exhausted, random legal"
+
+    def _unverified_prediction(self, key: str) -> ActionKey | None:
+        """A predicted edge at this state, never executed: the cheapest check of the effect model
+        (a change predicted into a known state first, then a predicted no-op). Ties random."""
+        node = self.graph.nodes.get(key)
+        if node is None:
+            return None
+        predicted = [(a, e) for a, e in node.tested.items() if e.predicted]
+        if not predicted:
+            return None
+        return max(predicted, key=lambda ae: (ae[1].changed, self.rng.random()))[0]
 
     def _move_toward_unknown(self) -> tuple[ActionKey, str] | None:
         """Follow or make a movement plan to the nearest position with an unpredictable key."""
@@ -645,7 +699,7 @@ class GraphExplorer:
         if not self.move_plan:
             cells = self.avatar.avatar_cells(self.current_grid)  # type: ignore[union-attr]
             path = plan_moves(self.current_grid, cells, self._known_vectors(), self.passability, goal=None,
-                              forbidden=self.lethal_moves)  # type: ignore[arg-type]
+                              forbidden=self.lethal_moves, transports=self.transports)  # type: ignore[arg-type]
             if path is None:
                 return None
             if not path:
@@ -747,7 +801,10 @@ class GraphExplorer:
         if COMPLEX_ACTION_ID in legal and observation.grid is not None:
             objects = segment_objects(observation.grid)
             objects.sort(key=lambda o: (o.size, o.bbox))  # small things first: buttons
-            for obj in objects[: self.max_clicks]:
+            ordered = objects
+            if self.diverse_clicks and len(objects) > self.max_clicks:
+                ordered = self._diverse(objects)   # only the cap may not drop a kind; the order stays
+            for obj in ordered[: self.max_clicks]:
                 y, x = obj.anchor
                 key = (COMPLEX_ACTION_ID, int(x), int(y))
                 keys.append(key)
@@ -759,6 +816,18 @@ class GraphExplorer:
                 keys.append(key)
                 classes[key] = click_class(int(observation.grid[h // 2, w // 2]), h * w)
         return keys, classes
+
+    @staticmethod
+    def _diverse(objects: list) -> list:
+        """One instance of every signature first, then the rest, each part in the given order: a
+        click cap must never drop the only object of its kind."""
+        seen: set = set()
+        first, rest = [], []
+        for obj in objects:
+            sig = object_signature(obj)
+            (rest if sig in seen else first).append(obj)
+            seen.add(sig)
+        return first + rest
 
     def _random_legal(self, observation: Observation) -> ActionKey:
         legal = observation.available_actions or [1]
@@ -782,6 +851,7 @@ class GraphExplorer:
         self.level_start = None
         self.lethal_moves = set()
         self.probed_here = set()
+        self.transports = {}
         self.trail = set()
         self.drain_values = {}
         self.last_grid = None

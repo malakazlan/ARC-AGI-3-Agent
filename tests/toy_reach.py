@@ -6,6 +6,8 @@ Target: a 3x3 frame of colour 6 open at the bottom (a doorway); stepping onto it
 accepts the avatar once every dot is gone (before that, the centre is just floor).
 `decoys`: extra rare objects that do nothing (a colour-4 cell, a colour-7 cell), so the agent
 must verify candidates instead of guessing.
+`conveyor=(entry, exit)`: stepping onto the colour-8 entry cell lands the avatar on the exit
+cell in the same step (ls20's white strips carry the avatar 20 cells for one press).
 """
 from __future__ import annotations
 
@@ -20,10 +22,13 @@ DOTS = ((9, 8), (3, 3), (6, 6))
 
 
 class ReachToy:
-    def __init__(self, collect: int = 0, decoys: bool = True, levels: int = 1) -> None:
+    def __init__(self, collect: int = 0, decoys: bool = True, levels: int = 1,
+                 conveyor: tuple[tuple[int, int], tuple[int, int]] | None = None) -> None:
         self.collect = collect
         self.decoys = decoys
         self.levels = levels
+        # (entry cell, exit cell): stepping on the entry lands on the exit
+        self.conveyor = (tuple(conveyor[0]), tuple(conveyor[1])) if conveyor is not None else None
         self.levels_completed = 0
         self.state = "NOT_PLAYED"
         self.steps = 0
@@ -33,6 +38,8 @@ class ReachToy:
     def _layout(self) -> np.ndarray:
         g = np.zeros((12, 12), dtype=np.int8)
         g[5, 0:9] = 2                                 # a wall with a gap on the right
+        if self.conveyor is not None:
+            g[5, :] = 2                               # no gap: the conveyor is the only way across
         y0, x0, y1, x1 = TARGET_BOX
         g[y0:y1 + 1, x0:x1 + 1] = 6
         g[2, 9] = 0
@@ -40,6 +47,8 @@ class ReachToy:
         if self.decoys:
             g[7, 10] = 4
             g[10, 5] = 7
+        if self.conveyor is not None:
+            g[self.conveyor[0]] = 8         # a colour-8 strip: the conveyor's entry
         self.dots_left = set(DOTS[:self.collect])
         for (y, x) in self.dots_left:
             g[y, x] = 9
@@ -73,6 +82,10 @@ class ReachToy:
                 return self.observe()
         elif cell == 9:
             self.dots_left.discard((ny, nx))
+        elif self.conveyor is not None and (ny, nx) == self.conveyor[0]:
+            self.grid[py, px] = 0
+            self.grid[self.conveyor[1]] = 1             # carried to the exit, the strip stays
+            return self.observe()
         elif cell not in (0,):
             return self.observe()                       # walls, frame, decoys block
         self.grid[py, px] = 0

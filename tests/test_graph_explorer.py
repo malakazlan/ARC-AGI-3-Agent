@@ -208,13 +208,14 @@ def test_action_prior_can_be_disabled():
 
 # --- effects by signature: predictable actions are not executed ------------------------
 
-def _explorer_seeing(grid, available):
+def _explorer_seeing(grid, available, **kw):
     """An explorer that has observed one state with the given grid (no engine)."""
     import random
     from arc3.explore import GraphExplorer
     from arc3.types import Observation
 
-    ex = GraphExplorer(random.Random(0), use_action_prior=False)
+    kw.setdefault("verify_first", False)
+    ex = GraphExplorer(random.Random(0), use_action_prior=False, **kw)
     ex.observe(Observation("NOT_FINISHED", 0, 1, grid, list(available)))
     return ex
 
@@ -312,3 +313,67 @@ def test_each_key_is_tried_once_before_any_key_is_repeated():
     brain, log = run(game, steps=8, dial_cap=True, breadth_first=True)
     keys = [c.action_id for _, c in log if c.action_id in (1, 2, 3, 4)][:4]
     assert sorted(keys) == [1, 2, 3, 4]
+
+
+def test_click_candidates_cover_every_signature_before_repeating_one():
+    """70 dots and one big block with a 64-click cap: the block still gets a candidate click."""
+    import numpy as np
+
+    g = np.zeros((20, 16), dtype=np.int8)
+    for i in range(70):
+        g[2 * (i // 8), 2 * (i % 8)] = 2       # 70 isolated dots of colour 2 (rows 0-16, step 2)
+    g[17:20, 12:15] = 5                         # one 3x3 block of colour 5
+    ex = _explorer_seeing(g, [6])
+    key = ex.current_key
+    assert len(ex.graph.untested(key)) <= 64
+    assert any(g[a[2], a[1]] == 5 for a in ex.graph.untested(key))
+
+
+def test_exhausted_frontier_verifies_a_predicted_edge_instead_of_clicking_at_random():
+    import numpy as np
+    from arc3.types import Observation
+
+    g = np.zeros((8, 8), dtype=np.int8)
+    g[3, 0:6] = 2                                   # a wall
+    g[6, 6] = 5                                     # a button
+    ex = _explorer_seeing(g, [6])
+    key = ex.current_key
+    wall = next(a for a in ex.graph.untested(key) if g[a[2], a[1]] == 2)
+    sig = ex.click_sig[(key, wall)]
+    for _ in range(3):
+        ex.click_effects.record(sig, (wall[2], wall[1]), g, g)
+    for a in ex.graph.untested(key):
+        if a != wall:
+            ex.graph.record(key, a, key, changed=False, game_over=False, level_up=False)
+    action, reason = ex._pick(key, Observation("NOT_FINISHED", 0, 1, g, [6]))
+    assert action == wall
+    assert "verify" in reason
+    ex.graph.record(key, wall, key, changed=False, game_over=False, level_up=False)
+    action, reason = ex._pick(key, Observation("NOT_FINISHED", 0, 1, g, [6]))
+    assert g[action[2], action[1]] != 0             # a re-test of a candidate, not a background click
+
+
+def test_a_click_rule_is_executed_once_before_it_is_trusted():
+    """Three no-ops on one wall make a rule for the signature; the rule is verified on the
+    second wall (one click) and only then are further instances skipped."""
+    import numpy as np
+    from arc3.types import Observation
+
+    g = np.zeros((10, 10), dtype=np.int8)
+    g[1, 0:6] = 2                                   # wall A
+    g[5, 0:6] = 2                                   # wall B, same signature
+    g[8, 0:6] = 2                                   # wall C
+    g[9, 9] = 5                                     # a button
+    ex = _explorer_seeing(g, [6], verify_first=True)
+    key = ex.current_key
+    walls = [a for a in ex.graph.untested(key) if g[a[2], a[1]] == 2]
+    sig = ex.click_sig[(key, walls[0])]
+    for _ in range(3):
+        ex.click_effects.record(sig, (walls[0][2], walls[0][1]), g, g)
+    live = ex._live_untested(key, count=True)
+    assert walls[1] in live and walls[2] in live    # the rule is unverified: other instances stay live
+    ex.pending = (key, walls[1])
+    ex.observe(Observation("NOT_FINISHED", 0, 1, g, [6]))   # the click did nothing, as predicted
+    assert sig in ex.verified_sigs
+    live = ex._live_untested(key, count=True)
+    assert walls[2] not in live                     # trusted now: the third wall is skipped

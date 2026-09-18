@@ -74,3 +74,41 @@ def test_consistent_no_op_is_a_global_no_op():
         fx.record(sig, (3, 2), g, g)
     effect = fx.global_effect(sig)
     assert effect is not None and not effect.changed
+
+
+def test_masked_cells_such_as_a_draining_bar_do_not_break_consistency():
+    fx = ClickEffects(k=3)
+    sig = (5, "h3", 3)
+    mask = np.zeros((8, 8), dtype=bool); mask[7, :] = True       # a step bar on the last row
+    for i in range(3):
+        before = grid8(); before[1, 1:4] = 5; before[7, :] = 6; before[7, :i] = 0
+        after = before.copy(); after[1, 1:4] = 7; after[7, i] = 0   # the bar drains one more cell
+        fx.record(sig, (1, 2), before, after, mask=mask)
+    effect = fx.global_effect(sig)
+    assert effect is not None and effect.changed
+    assert all(dy != 6 for dy, _, _ in effect.diff)                 # nothing recorded on the bar row
+
+
+def test_a_contradicted_signature_never_generalises_again():
+    """One instance responded, three others did nothing: the class is split, no global rule."""
+    fx = ClickEffects(k=3)
+    sig = (9, "sq", 36)
+    before = grid8(); before[1:4, 1:4] = 9
+    after = before.copy(); after[1:4, 1:4] = 8
+    fx.record(sig, (2, 2), before, after)
+    for _ in range(3):
+        fx.record(sig, (2, 2), before, before)
+    assert fx.global_effect(sig) is None
+
+
+def test_a_contradicted_signature_still_predicts_per_instance():
+    fx = ClickEffects(k=3)
+    sig = (9, "sq", 36)
+    before = grid8(); before[1:4, 1:4] = 9; before[5:8, 5:8] = 9
+    toggled = before.copy(); toggled[1:4, 1:4] = 8
+    fx.record(sig, (2, 2), before, toggled)                          # the top-left one toggles
+    for _ in range(3):
+        fx.record(sig, (6, 6), before, before)                       # the bottom-right one is dead
+    assert fx.predict(sig, (6, 6), before) is not None               # known dead here
+    assert np.array_equal(fx.predict(sig, (6, 6), before), before)
+    assert fx.predict(sig, (2, 2), before) is None                   # one toggle is not enough

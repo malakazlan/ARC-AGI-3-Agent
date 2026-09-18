@@ -34,6 +34,12 @@ class Arc3Config:
     # Ablation switches for the two discovery changes of 2026-09-18.
     dial_cap: bool = False       # skip confirmed key dials on avatar games (costs su15/tu93 with breadth-first)
     breadth_first: bool = True   # try every move key once before repeating any (elects the avatar, shows the bar)
+    # Click model switches (2026-09-18 click autopsies, ft09 and lp85).
+    click_mask: bool = True          # the step bar is not part of what a click did
+    click_split: bool = True         # a contradicted signature predicts per instance only
+    verify_first: bool = True        # a signature's rule is trusted only after one confirmed prediction
+    verify_predictions: bool = True  # exhausted frontier: execute a predicted edge before any random click
+    diverse_clicks: bool = True      # the click cap keeps one instance of every signature first
     # Optional local LLM layer. Off by default; must degrade to rules-only when missing.
     reasoner_enabled: bool = False
 

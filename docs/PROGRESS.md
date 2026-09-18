@@ -162,3 +162,20 @@ Dev machine: i5-7300HQ, 4 cores, 7.7 GB RAM in WSL. Benchmarks with many seeds w
   otherwise within noise of 1.36). Kept.
 - Next: click dead-signature rule (trace probe: 4% dead clicks, 12% bar-only), then the
   energy subgoal plan for ls20 L3.
+- 2026-09-18 - First Kaggle submission (kernel v1, the 13 / 1.36 agent) scored **0.30 public** (id 56332856, COMPLETE). This is the baseline every later submission is judged against.
+
+## 2026-09-18 - Late: click model and the route planner
+
+- Click model (KWIK-style): effects generalised by signature die on the first contradiction,
+  are verified once before being trusted, exclude the step bar, and an exhausted frontier
+  verifies predictions before clicking at random. Dev, 3 seeds: **14 median levels, RHAE
+  1.35** (`2026-09-18-clickfx2-dev`); ft09 won on every seed; the vc33 slowdown of the first
+  version was traced to candidate order and removed (cap-bound diversity only).
+- Route planner (`arc3/plan/route.py`): ordered stops with the energy projected along the
+  route, refills inserted where it runs dry; wired into the display exploit. ls20 L3 now
+  presses the rotator twice in a row instead of walking to a refill between presses, but the
+  level still needs the colour tool and the conveyors (a move onto a colour-1 strip carried
+  the avatar 20 cells for free): transport learning is the next build.
+- Fixes on the way: a walk plan is dropped when the avatar stops moving (ls20 pressed into a
+  wall five times); the bar's last cell no longer counts against the rarity of same-shaped
+  refills.

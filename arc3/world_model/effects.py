@@ -94,27 +94,54 @@ class Effect:
     diff: RelativeDiff
 
 
-def relative_diff(click: tuple[int, int], before: np.ndarray, after: np.ndarray) -> RelativeDiff:
+def relative_diff(click: tuple[int, int], before: np.ndarray, after: np.ndarray,
+                  mask: np.ndarray | None = None) -> RelativeDiff:
+    """Cells that changed, relative to the click. Masked cells (the step bar) are not part of
+    what a click did."""
     cy, cx = click
-    ys, xs = np.nonzero(before != after)
+    changed = before != after
+    if mask is not None and mask.shape == changed.shape:
+        changed &= ~mask
+    ys, xs = np.nonzero(changed)
     return tuple(sorted((int(y - cy), int(x - cx), int(after[y, x])) for y, x in zip(ys, xs)))
 
 
 @dataclass
 class ClickEffects:
-    """Per object signature, the relative effect of clicking it. Consistent k times => global."""
+    """Per object signature, the relative effect of clicking it. Consistent k times => global,
+    but one contradiction splits the class for good (a legend tile and a playable tile can share
+    a signature): a contradicted signature only predicts per instance (signature + position)."""
 
     k: int = 3
+    split: bool = True
     history: dict[Signature, list[RelativeDiff]] = field(default_factory=dict)
+    contradicted: set = field(default_factory=set)
+    instances: dict[tuple, list[RelativeDiff]] = field(default_factory=dict)
 
-    def record(self, sig: Signature, click: tuple[int, int], before: np.ndarray, after: np.ndarray) -> None:
-        diff = relative_diff(click, before, after)
+    def record(self, sig: Signature, click: tuple[int, int], before: np.ndarray, after: np.ndarray,
+               mask: np.ndarray | None = None) -> bool:
+        """Returns True when this observation contradicted the signature's rule for the first time."""
+        diff = relative_diff(click, before, after, mask)
         seen = self.history.setdefault(sig, [])
+        newly = self.split and bool(seen) and diff != seen[-1] and sig not in self.contradicted
+        if self.split and seen and diff != seen[-1]:
+            self.contradicted.add(sig)
         seen.append(diff)
         del seen[:-max(self.k, 5)]
+        inst = self.instances.setdefault((sig, click), [])
+        inst.append(diff)
+        del inst[:-self.k]
+        return newly
 
     def global_effect(self, sig: Signature) -> Effect | None:
-        seen = self.history.get(sig, [])
+        if sig in self.contradicted:
+            return None
+        return self._consistent(self.history.get(sig, []))
+
+    def instance_effect(self, sig: Signature, click: tuple[int, int]) -> Effect | None:
+        return self._consistent(self.instances.get((sig, click), []))
+
+    def _consistent(self, seen: list[RelativeDiff]) -> Effect | None:
         if len(seen) < self.k:
             return None
         recent = seen[-self.k:]
@@ -123,7 +150,7 @@ class ClickEffects:
         return Effect(changed=bool(recent[0]), diff=recent[0])
 
     def predict(self, sig: Signature, click: tuple[int, int], grid: np.ndarray) -> np.ndarray | None:
-        effect = self.global_effect(sig)
+        effect = self.global_effect(sig) or self.instance_effect(sig, click)
         if effect is None:
             return None
         out = grid.copy()
