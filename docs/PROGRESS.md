@@ -129,3 +129,13 @@ Dev machine: i5-7300HQ, 4 cores, 7.7 GB RAM in WSL. Benchmarks with many seeds w
   subgoal plan of design v2 section 6.
 - The 9 -> 5 drop of the morning is explained (dial cap and breadth-first together; cn04 lost
   at the election change) and su15/tu93 are recovered by the new defaults.
+
+## 2026-09-18 — Step 3 closed for the day
+
+- Dev, 3 seeds, 1000 actions: **11 median levels, RHAE 1.20** with the rule policy as default
+  (explorer best 9 / 0.37 this morning). ls20 L1 25 and L2 45 actions on all seeds (human
+  22 / 123), su15 and tu93 recovered, s5i5 level 1 new; cn04 lost since the election change.
+- Notebook rebuilt and dry-run PASS on the local competition-mode gateway (25 games, 7 levels,
+  0 fallbacks, 0 tracebacks). `make submit` is the owner's step.
+- Open: ls20 L3 (consumable refills, needs the subgoal plan), click games' true waste (su15
+  75%, sp80 51%), tu93's sensitivity to the opening order, cn04.

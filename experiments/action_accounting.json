@@ -1,99 +1,43 @@
 [
   {
-    "game": "cn04",
-    "level": 0,
-    "human": null,
-    "learn": 50,
-    "retest": 776,
-    "navigate": 63,
-    "waste": 111,
-    "total": 1000,
-    "retest_by_action": {
-      "A3": 100,
-      "A5": 144,
-      "A2": 32,
-      "A1": 17,
-      "A4": 214,
-      "A6": 269
-    },
+    "game": "ls20",
+    "level": 1,
+    "human": 22,
+    "learn": 12,
+    "retest": 0,
+    "exploit": 2,
+    "navigate": 11,
+    "waste": 0,
+    "retest_new": 0,
+    "retest_known": 0,
+    "total": 25,
+    "retest_by_action": {},
     "planner": {
-      "retests_avoided": 1113,
-      "planned_moves": 1,
+      "retests_avoided": 6,
+      "planned_moves": 0,
       "mismatches": 0,
       "planner_resets": 0,
-      "avatar_known_at": 6
+      "avatar_known_at": 7
     }
   },
   {
-    "game": "re86",
-    "level": 0,
-    "human": null,
-    "learn": 14,
-    "retest": 688,
-    "navigate": 33,
-    "waste": 265,
-    "total": 1000,
-    "retest_by_action": {
-      "A5": 194,
-      "A1": 237,
-      "A3": 30,
-      "A4": 31,
-      "A2": 196
-    },
+    "game": "ls20",
+    "level": 2,
+    "human": 123,
+    "learn": 0,
+    "retest": 0,
+    "exploit": 7,
+    "navigate": 38,
+    "waste": 0,
+    "retest_new": 0,
+    "retest_known": 0,
+    "total": 45,
+    "retest_by_action": {},
     "planner": {
-      "retests_avoided": 1072,
-      "planned_moves": 22,
-      "mismatches": 1,
+      "retests_avoided": 6,
+      "planned_moves": 0,
+      "mismatches": 0,
       "planner_resets": 0,
-      "avatar_known_at": 103
-    }
-  },
-  {
-    "game": "g50t",
-    "level": 0,
-    "human": null,
-    "learn": 15,
-    "retest": 229,
-    "navigate": 596,
-    "waste": 160,
-    "total": 1000,
-    "retest_by_action": {
-      "A2": 1,
-      "A1": 2,
-      "A3": 64,
-      "A4": 31,
-      "A5": 131
-    },
-    "planner": {
-      "retests_avoided": 1225,
-      "planned_moves": 367,
-      "mismatches": 2,
-      "planner_resets": 0,
-      "avatar_known_at": 9
-    }
-  },
-  {
-    "game": "sp80",
-    "level": 1,
-    "human": 39,
-    "learn": 44,
-    "retest": 361,
-    "navigate": 54,
-    "waste": 18,
-    "total": 477,
-    "retest_by_action": {
-      "A4": 141,
-      "A5": 33,
-      "A6": 21,
-      "A3": 105,
-      "A2": 45,
-      "A1": 16
-    },
-    "planner": {
-      "retests_avoided": 235,
-      "planned_moves": 6,
-      "mismatches": 3,
-      "planner_resets": 1,
       "avatar_known_at": 7
     }
   }

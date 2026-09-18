@@ -1,0 +1,21 @@
+# effective config (defaults + benchmark overrides)
+seed: 0
+global_budget_s: 19800.0
+max_actions_per_game: 2000
+policy: "rules"
+max_nodes_per_level: 5000
+max_click_candidates: 64
+countdown_mask: true
+budget_aware: true
+action_prior: true
+planner: true
+planner_max_mismatches: 3
+effects: true
+dial_cap: false
+breadth_first: true
+reasoner_enabled: false
+bench_games: ["cn04", "su15", "tu93"]
+bench_seeds: [0, 1, 2]
+bench_max_actions: 1000
+bench_time_per_game_s: 300.0
+bench_overrides: {}
