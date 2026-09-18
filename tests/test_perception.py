@@ -254,3 +254,97 @@ def test_countdown_mask_requires_differing_actions_at_each_offset():
     assert not mask[7, 0]              # offset 1: both attempts pressed 4, no evidence
     assert mask[7, 1:5].all()          # offsets 2..5: actions differed, bar still drained
     assert not mask[:7].any()          # the two trails differ, nothing else masked
+
+
+def test_countdown_mask_finds_a_bar_that_drains_and_refills():
+    """ls20-style: a 4-cell bar drains one cell per step, refills at step 5, drains again. The
+    sequence is identical in every attempt whatever the player did; the player differs."""
+    from arc3.perception import countdown_mask
+
+    def attempt(path):
+        frames = []
+        for t, (py, px) in enumerate(path):
+            g = grid8()
+            phase = t % 5                        # 0: full, 1..4: drained by phase cells
+            g[7, 0:4] = 3
+            g[7, 0:phase] = 0
+            g[py, px] = 1
+            frames.append(g)
+        return frames
+
+    a1 = attempt([(1, 1), (1, 2), (1, 3), (2, 3), (3, 3), (3, 4), (4, 4), (5, 4), (5, 5), (5, 6), (6, 6)])
+    a2 = attempt([(1, 1), (2, 1), (3, 1), (3, 2), (3, 3), (4, 3), (4, 2), (4, 1), (5, 1), (6, 1), (6, 2)])
+    actions = [[4, 4, 2, 2, 4, 2, 2, 4, 4, 2], [2, 2, 4, 4, 2, 3, 3, 2, 2, 4]]
+    mask = countdown_mask([a1, a2], actions)
+    assert mask[7, 0:4].all()
+    assert not mask[:7].any()
+
+
+def test_countdown_mask_ignores_a_trail_cell_entered_by_the_same_key_in_every_attempt():
+    """A cell the player enters (and later leaves) at about the same step in two attempts by the
+    same key press is the player's trail, not a bar, even if the attempts diverge afterwards."""
+    from arc3.perception import countdown_mask
+
+    def attempt(path):
+        frames = []
+        for (py, px) in path:
+            g = grid8()
+            g[py, px] = 1
+            frames.append(g)
+        return frames
+
+    # both attempts step right into (1, 2) at offset 1 with key 4, then part ways; (1, 2) and
+    # (1, 3) each change twice (entered, then left) at nearly the same offsets in both attempts
+    a1 = attempt([(1, 1), (1, 2), (1, 3), (2, 3), (3, 3), (3, 4), (4, 4)])
+    a2 = attempt([(1, 1), (1, 2), (1, 3), (1, 4), (2, 4), (2, 5), (3, 5)])
+    actions = [[4, 4, 2, 2, 4, 2], [4, 4, 4, 2, 4, 2]]
+    assert not countdown_mask([a1, a2], actions).any()
+
+
+def test_countdown_mask_rejects_a_change_the_longer_attempt_never_made():
+    """Cells that changed in the last steps of a short attempt and only much later in a longer
+    one are not a bar: the longer attempt had every chance to show the change then and did not."""
+    from arc3.perception import countdown_mask
+
+    def attempt(n, drain_at):
+        frames = []
+        for t in range(n):
+            g = grid8()
+            if drain_at is not None:
+                for k, (y, x) in enumerate([(7, 0), (7, 1), (7, 2)]):
+                    if t >= drain_at + (k + 1) // 2:
+                        g[y, x] = 3
+            g[1, 1 + (t % 3)] = 1
+            frames.append(g)
+        return frames
+
+    short = attempt(8, drain_at=6)        # (7,0) at offset 6, (7,1) and (7,2) at 7: its last steps
+    long = attempt(30, drain_at=20)       # lived far longer and changed those cells much later
+    actions = [[4, 2, 3, 1, 4, 2, 3], [2, 4, 1, 3, 2, 4] * 4 + [2, 4, 1, 3, 2]]
+    assert not countdown_mask([short, long], actions)[7].any()
+
+
+def test_countdown_mask_requires_a_drain_front_that_sweeps_along_the_bar():
+    """Bar cells drain in order along the bar's long axis. A player's early trail (an L of cells
+    first changed at steps 3, 1, 7 and 2 in every attempt) has no such order and is not masked."""
+    from arc3.perception import countdown_mask
+
+    def attempt(keys):
+        # cells first change at fixed offsets whatever the key pressed; two cells then flip back
+        first = {(1, 0): 3, (1, 1): 1, (1, 2): 7, (2, 0): 2}
+        frames = []
+        for t in range(12):
+            g = grid8()
+            for cell, o in first.items():
+                if t >= o:
+                    g[cell] = 1
+            if t >= 4:
+                g[1, 0] = 0
+            if t >= 8:
+                g[1, 2] = 0
+            frames.append(g)
+        return frames
+
+    a1 = attempt(None); a2 = attempt(None)
+    actions = [[1, 3, 1, 4, 2, 3, 4, 1, 2, 3, 4], [2, 2, 2, 1, 4, 4, 2, 3, 1, 1, 3]]
+    assert not countdown_mask([a1, a2], actions).any()

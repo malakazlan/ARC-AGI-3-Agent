@@ -130,3 +130,13 @@ def test_partial_move_votes_blocks_for_the_cells_beyond():
     assert ex.diagnostics["mismatches"] == 0
     assert ex.passability.votes[5].blocks == 1
     assert ex.passability.votes[0].passes >= 4
+
+
+def test_cells_the_avatar_has_walked_are_never_masked_as_a_bar():
+    """On a toy with no energy bar, two attempts whose early trails coincide must not produce a
+    mask: the explorer knows where its avatar has been, and a bar is never walked over."""
+    game = ToyGame(levels=1, extra_cells={(6, 6): 0})
+    brain, _ = run(game, steps=300)
+    ex = brain.policy
+    assert ex.diagnostics["mask_cells"] == 0
+    assert ex.mask is None or not ex.mask.any()

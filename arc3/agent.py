@@ -121,6 +121,8 @@ class Orchestrator:
                 use_planner=config.planner,
                 max_mismatches=config.planner_max_mismatches,
                 use_effects=config.effects,
+                dial_cap=config.dial_cap,
+                breadth_first=config.breadth_first,
             )
         return self._random_policy
 

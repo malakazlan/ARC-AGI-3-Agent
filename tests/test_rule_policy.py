@@ -61,3 +61,20 @@ def test_rule_policy_falls_back_to_the_explorer_when_no_hypothesis_forms():
     assert all(c.action_id in (0, 1, 2, 3, 4) for _, c in log)
     assert brain.diagnostics["fallbacks"] == 0
     assert brain.policy.store.goal is None or game.levels_completed == 1
+
+
+def test_rule_policy_uses_the_target_display_itself_as_the_exit():
+    """ls20's real layout: there is no separate exit; the matched avatar walks into the target."""
+    game = DisplayToy(exit_in_target=True)
+    brain, _ = run(game, steps=200)
+    assert game.levels_completed == 1
+    assert game.steps <= 60
+
+
+def test_rule_policy_keeps_using_a_rotator_it_is_standing_on():
+    """ls20's real rotator: the avatar steps onto the dial and hides it. The tool is not lost."""
+    game = DisplayToy(rotator_walkable=True, exit_in_target=True)
+    brain, _ = run(game, steps=200)
+    assert game.levels_completed == 1
+    assert game.steps <= 60
+    assert brain.diagnostics["hypotheses_demoted"] == 0

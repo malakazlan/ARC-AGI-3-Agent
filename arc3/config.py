@@ -31,6 +31,9 @@ class Arc3Config:
     # Learn click effects by object signature and non-move key effects by avatar appearance;
     # skip actions whose effect is a known no-op or leads to a state already explored.
     effects: bool = True
+    # Ablation switches for the two discovery changes of 2026-09-18.
+    dial_cap: bool = True        # skip confirmed key dials on avatar games
+    breadth_first: bool = True   # try every action class once before repeating any
     # Optional local LLM layer. Off by default; must degrade to rules-only when missing.
     reasoner_enabled: bool = False
 

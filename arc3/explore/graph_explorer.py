@@ -47,7 +47,10 @@ class GraphExplorer:
     def __init__(self, rng: random.Random, max_nodes: int = 5000, max_clicks: int = 64,
                  use_countdown_mask: bool = True, budget_aware: bool = True,
                  use_action_prior: bool = True, use_planner: bool = True,
-                 max_mismatches: int = 3, use_effects: bool = True) -> None:
+                 max_mismatches: int = 3, use_effects: bool = True,
+                 dial_cap: bool = True, breadth_first: bool = True) -> None:
+        self.dial_cap = dial_cap
+        self.breadth_first = breadth_first
         self.rng = rng
         self.max_nodes = max_nodes
         self.max_clicks = max_clicks
@@ -80,6 +83,7 @@ class GraphExplorer:
         self._last_levels: int | None = None
         # per-level attempt memory
         self.mask: np.ndarray | None = None
+        self.trail: set[tuple[int, int]] = set()  # every cell the avatar has occupied this level
         self.drain_values: dict[tuple[int, int], int] = {}  # bar cell -> value it drains to
         self.last_grid: np.ndarray | None = None
         self.budget: int | None = None
@@ -107,9 +111,13 @@ class GraphExplorer:
         if observation.state == "GAME_OVER":
             self._learn_death()
             self._on_game_over()
+            self.last_grid = None  # the next frame comes after a reset: never diff across a death
+            self.expected = None
             return
         if observation.grid is None:
             self._forget_position()
+            self.last_grid = None
+            self.expected = None
             return
 
         self._learn_move(observation.grid)
@@ -160,6 +168,9 @@ class GraphExplorer:
         outcome = self.avatar.observe(before, key, grid, self.mask)
         if not was_confident and self.avatar.confident and self.diagnostics["avatar_known_at"] is None:
             self.diagnostics["avatar_known_at"] = self.trace and len(self.trace)
+        if self.avatar.confident and self.avatar.last_cells:
+            self.trail.update(self.avatar.last_cells)
+            self._unmask_trail()
         vec = self.avatar.vector(key)
         if old_cells and vec is not None and self.mask_ok(before):
             kind = outcome
@@ -370,6 +381,9 @@ class GraphExplorer:
         if shape is None:
             return
         mask = countdown_mask_from_signatures(self.attempts, shape)
+        for (y, x) in self.trail:
+            if 0 <= y < shape[0] and 0 <= x < shape[1]:
+                mask[y, x] = False  # the player's own trail is never an energy bar
         if not mask.any():
             return
         if self.mask is None or mask.shape != self.mask.shape or not np.array_equal(mask, self.mask):
@@ -378,12 +392,28 @@ class GraphExplorer:
             self.diagnostics["mask_cells"] = int(mask.sum())
             self._rebuild_graph()
 
+    def _unmask_trail(self) -> None:
+        """Mask cells the avatar turned out to walk over are not a bar: drop them."""
+        if self.mask is None:
+            return
+        hit = [(y, x) for (y, x) in self.avatar.last_cells  # type: ignore[union-attr]
+               if 0 <= y < self.mask.shape[0] and 0 <= x < self.mask.shape[1] and self.mask[y, x]]
+        if not hit:
+            return
+        for (y, x) in hit:
+            self.mask[y, x] = False
+        self.drain_values = self._drain_values(self.mask) if self.mask.any() else {}
+        self.diagnostics["mask_cells"] = int(self.mask.sum())
+        if not self.mask.any():
+            self.mask = None
+
     def _drain_values(self, mask: np.ndarray) -> dict[tuple[int, int], int]:
+        """Per bar cell, the value it ends an attempt with (fully drained)."""
         values: dict[tuple[int, int], int] = {}
         for sig in self.attempts:
-            for cell, (_offset, value) in sig.once.items():
-                if mask[cell] and cell not in values:
-                    values[cell] = value
+            for cell, seq in sig.sequences.items():
+                if mask[cell]:
+                    values[cell] = seq[-1][1]
         return values
 
     def _learn_budget(self) -> None:
@@ -505,7 +535,7 @@ class GraphExplorer:
                     continue
                 kept.append(a)
             untested = kept
-        if self._planner_ready():
+        if self.dial_cap and self._planner_ready():
             # A confirmed key dial on an avatar game (rotate, recolour) is one axis of a product
             # space (position x dial state) that the effect model already predicts: pressing it in
             # every new position teaches nothing. Clicks are never capped: in click games a toggle
@@ -534,8 +564,8 @@ class GraphExplorer:
             stats = self.prior.stats.get(self.graph.action_class(key, a))  # type: ignore[union-attr]
             return stats.tries if stats else 0
 
-        scored = [(tries(a) == 0, self.prior.score(self.graph.action_class(key, a)), self.rng.random(), a)
-                  for a in tier]
+        scored = [(self.breadth_first and tries(a) == 0, self.prior.score(self.graph.action_class(key, a)),
+                   self.rng.random(), a) for a in tier]
         return max(scored)[3]
 
     def _plan_from(self, key: str, is_frontier) -> list[tuple[str, ActionKey]]:
@@ -588,6 +618,7 @@ class GraphExplorer:
         self.graph = StateGraph(self.max_nodes)
         self.trace = []
         self.mask = None
+        self.trail = set()
         self.drain_values = {}
         self.last_grid = None
         self.budget = None

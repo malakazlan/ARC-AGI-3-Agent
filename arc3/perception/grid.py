@@ -75,33 +75,46 @@ def volatility_mask(frames: list[np.ndarray]) -> np.ndarray:
 
 
 class AttemptSignature:
-    """Per-attempt record of cells that changed exactly once: cell -> (step offset, new value).
+    """Per-attempt record of how each cell changed: cell -> ((offset, new value), ...).
 
-    Built incrementally from consecutive frames so no frame buffer is needed. Cells that
-    change more than once are dropped (None) and never revived.
+    Built incrementally from consecutive frames so no frame buffer is needed. Cells that change
+    more than MAX_CHANGES times are dropped (None) and never revived.
     """
+
+    MAX_CHANGES = 8
 
     def __init__(self) -> None:
         self.length = 0
         self.shape: tuple[int, int] | None = None
         self.actions: list[object] = []  # actions[o] produced frame o; actions[0] is None
         self._prev: np.ndarray | None = None
-        self._cells: dict[tuple[int, int], tuple[int, int] | None] = {}
+        self._cells: dict[tuple[int, int], list[tuple[int, int]] | None] = {}
 
     def push(self, frame: np.ndarray, action: object = None) -> None:
         if self._prev is not None and frame.shape == self._prev.shape:
             offset = self.length
             for y, x in zip(*np.nonzero(frame != self._prev)):
                 cell = (int(y), int(x))
-                self._cells[cell] = None if cell in self._cells else (offset, int(frame[y, x]))
+                seq = self._cells.get(cell, [])
+                if seq is None:
+                    continue
+                if len(seq) >= self.MAX_CHANGES:
+                    self._cells[cell] = None
+                    continue
+                seq.append((offset, int(frame[y, x])))
+                self._cells[cell] = seq
         self.shape = (int(frame.shape[0]), int(frame.shape[1]))
         self.actions.append(None if self._prev is None else action)
         self._prev = frame
         self.length += 1
 
     @property
+    def sequences(self) -> dict[tuple[int, int], tuple[tuple[int, int], ...]]:
+        return {c: tuple(s) for c, s in self._cells.items() if s}
+
+    @property
     def once(self) -> dict[tuple[int, int], tuple[int, int]]:
-        return {c: s for c, s in self._cells.items() if s is not None}
+        return {c: s[0] for c, s in self._cells.items() if s and len(s) == 1}
 
     def changed(self, cell: tuple[int, int]) -> bool:
         return cell in self._cells
@@ -111,48 +124,56 @@ def countdown_mask_from_signatures(signatures: list[AttemptSignature], shape: tu
                                    min_attempts: int = 2) -> np.ndarray:
     """Cells that behave like an energy or countdown bar across attempts of the same level.
 
-    A bar cell changes exactly once per attempt, at the same step offset and to the same value,
-    in every attempt that lasted long enough to reach that offset, and in at least two attempts.
-    The change must be independent of what the agent did: among the supporting attempts, the
-    actions taken at that offset must differ (an identical replay would make the player's own
-    trail look like a bar; unknown actions, None, are treated as differing). Isolated cells are
-    ignored (the start cell the player always leaves at step 1 would otherwise qualify): bar
-    cells come in connected groups with staggered offsets.
+    A bar cell's whole change sequence (offsets and values) is the same in every attempt, as
+    far as the shorter attempt lets us compare, and it changed in at least two attempts. The
+    changes must be independent of what the agent did: at some offset of the sequence the
+    supporting attempts pressed different keys (an identical replay would make the player's own
+    trail look like a bar; unknown actions, None, count as differing). Isolated cells are
+    ignored: bar cells come in connected groups whose first offsets are staggered.
     """
     shape = (int(shape[0]), int(shape[1]))
     mask = np.zeros(shape, dtype=bool)
     signatures = [s for s in signatures if s.length >= 2 and s.shape == shape]
     if len(signatures) < min_attempts:
         return mask
-    onces = [s.once for s in signatures]
-    consistent: dict[tuple[int, int], tuple[int, int]] = {}
+    seqs = [s.sequences for s in signatures]
+    consistent: dict[tuple[int, int], tuple[tuple[int, int], ...]] = {}
     seen: set[tuple[int, int]] = set()
-    for once in onces:
-        for cell, (offset, value) in once.items():
+    for i, seq_map in enumerate(seqs):
+        for cell, seq in seq_map.items():
             if cell in seen:
                 continue
             seen.add(cell)
-            support = 0
+            support = []
             ok = True
-            actions_seen: set[object] = set()
-            unknown = False
-            for sig, other in zip(signatures, onces):
-                if sig.length <= offset:
-                    if sig.changed(cell):
+            for j, sig in enumerate(signatures):
+                other = seqs[j].get(cell, ())
+                if sig.changed(cell) and not other:
+                    ok = False  # changed too often there
+                    break
+                for k, sig_k in enumerate(signatures):
+                    if k <= j:
+                        continue
+                    window = min(sig.length, sig_k.length)
+                    a = tuple(p for p in other if p[0] < window)
+                    b = tuple(p for p in seqs[k].get(cell, ()) if p[0] < window)
+                    if not _same_drain(a, b, sig.length, sig_k.length):
                         ok = False
                         break
-                    continue
-                if other.get(cell) != (offset, value):
-                    ok = False
+                if not ok:
                     break
-                support += 1
-                action = sig.actions[offset] if offset < len(sig.actions) else None
-                if action is None:
-                    unknown = True
-                actions_seen.add(action)
-            independent = unknown or len(actions_seen) >= 2
-            if ok and support >= min_attempts and independent:
-                consistent[cell] = (offset, value)
+                if other:
+                    support.append(j)
+            if not ok or len(support) < min_attempts:
+                continue
+            # independence is judged at the change we compared: each attempt's first change
+            acts = set()
+            for j in support:
+                sig = signatures[j]
+                first = seqs[j][cell][0][0]
+                acts.add(sig.actions[first] if first < len(sig.actions) else None)
+            if None in acts or len(acts) >= 2:
+                consistent[cell] = seq
     if not consistent:
         return mask
     candidates = np.zeros(shape, dtype=np.int8)
@@ -161,10 +182,48 @@ def countdown_mask_from_signatures(signatures: list[AttemptSignature], shape: tu
     for group in segment_objects(candidates, background=0):
         cells = [c for c in consistent if group.bbox[0] <= c[0] <= group.bbox[2]
                  and group.bbox[1] <= c[1] <= group.bbox[3]]
-        if group.size >= 2 and len({consistent[c][0] for c in cells}) >= 2:
+        firsts = {c: consistent[c][0][0] for c in cells}
+        if group.size >= 2 and len(set(firsts.values())) >= 2 and _drain_front_in_order(firsts):
             for y, x in cells:
                 mask[y, x] = True
     return mask
+
+
+def _drain_front_in_order(firsts: dict[tuple[int, int], int]) -> bool:
+    """A bar drains as a front that sweeps along its long axis: within every row (of a wide
+    group) or column (of a tall group) the first-change offsets are monotone. A player's trail
+    changes its cells in walking order, which is not monotone along either axis."""
+    ys = [y for y, _ in firsts]; xs = [x for _, x in firsts]
+    wide = (max(xs) - min(xs)) >= (max(ys) - min(ys))
+    lines: dict[int, list[tuple[int, int]]] = {}
+    for (y, x), o in firsts.items():
+        along, across = (x, y) if wide else (y, x)
+        lines.setdefault(across, []).append((along, o))
+    for pts in lines.values():
+        pts.sort()
+        offsets = [o for _, o in pts]
+        inc = all(a <= b for a, b in zip(offsets, offsets[1:]))
+        dec = all(a >= b for a, b in zip(offsets, offsets[1:]))
+        if not (inc or dec):
+            return False
+    return True
+
+
+DRAIN_TOLERANCE = 2  # actions; a free move (conveyor) shifts a bar by one or two
+
+
+def _same_drain(a: tuple, b: tuple, len_a: int, len_b: int) -> bool:
+    """Two change sequences of one cell (cut to the shorter attempt's window) agree when their
+    first change happens at about the same offset with the same value. Later changes (refills)
+    may drift by a free action or two. When only one attempt shows a change inside the window,
+    the other must have ended before it could have shown it too."""
+    if not a and not b:
+        return True
+    if not a or not b:
+        first = (a or b)[0][0]
+        silent_length = len_b if a else len_a
+        return silent_length - first <= DRAIN_TOLERANCE  # the silent attempt ended right there
+    return abs(a[0][0] - b[0][0]) <= DRAIN_TOLERANCE and a[0][1] == b[0][1]
 
 
 def countdown_mask(attempts: list[list[np.ndarray]],

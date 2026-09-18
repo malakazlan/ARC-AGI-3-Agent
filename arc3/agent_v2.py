@@ -28,6 +28,7 @@ MOVE_KEYS = (1, 2, 3, 4)
 SMALL = 16          # cells; larger objects are walls, floors or panels
 RARE = 2            # at most this many objects share a salient signature
 TOUCH_LIMIT = 12    # touches of one dial before the hypothesis is doubted
+ENTRY_LIMIT = 4     # presses into the target display before it is dismissed as the exit
 Cells = frozenset[tuple[int, int]]
 
 
@@ -43,6 +44,7 @@ class RulePolicy:
             use_countdown_mask=config.countdown_mask, budget_aware=config.budget_aware,
             use_action_prior=config.action_prior, use_planner=config.planner,
             max_mismatches=config.planner_max_mismatches, use_effects=config.effects,
+            dial_cap=config.dial_cap, breadth_first=config.breadth_first,
         )
         self.store = RuleStore()
         self.mode = "discover"
@@ -50,7 +52,12 @@ class RulePolicy:
         self.tried_exits: set[tuple] = set()
         self.plan: list[int] = []
         self.plan_goal: str = ""
-        self.pending_touch: tuple[tuple, int] | None = None  # (signature, key) of the press we just made
+        self.pending_touch: tuple[tuple, int, Cells] | None = None  # (signature, key, cells) just pressed
+        self.tool_cells: dict[tuple, Cells] = {}  # where each touched tool was (it may be under us)
+        self.pending_exit: Cells | None = None    # avatar cells before a press into the display
+        self.entry_presses = 0
+        self.entry_blocked = 0
+        self.display_exit_tried = False
         self.touches = 0
         self.last_grid: np.ndarray | None = None
         self._last_levels: int | None = None
@@ -71,6 +78,11 @@ class RulePolicy:
         if observation.grid is not None and self.last_grid is not None and self.pending_touch is not None:
             self._read_touch(self.last_grid, observation.grid)
         self.pending_touch = None
+        if self.pending_exit is not None and observation.grid is not None and self.explorer.avatar is not None:
+            after = self.explorer.avatar.avatar_cells(observation.grid)
+            if after == self.pending_exit:
+                self.entry_blocked += 1
+        self.pending_exit = None
         if observation.grid is not None:
             self.last_grid = observation.grid
         else:
@@ -78,7 +90,8 @@ class RulePolicy:
             self.plan = []
 
     def _read_touch(self, before: np.ndarray, after: np.ndarray) -> None:
-        signature, key = self.pending_touch  # type: ignore[misc]
+        signature, key, cells = self.pending_touch  # type: ignore[misc]
+        self.tool_cells[signature] = cells
         mask = self.explorer.mask if (self.explorer.mask is not None and self.explorer.mask.shape == before.shape) else None
         avatar_before = self.explorer.avatar.avatar_cells(before) if self.explorer.avatar else frozenset()
         avatar_after = self.explorer.avatar.last_cells or frozenset()
@@ -111,8 +124,16 @@ class RulePolicy:
         self.store.new_level(levels)
         self.probed = set()
         self.tried_exits = set()
+        self.tool_cells = {}
         self.plan = []
         self.touches = 0
+        self._reset_exit()
+
+    def _reset_exit(self) -> None:
+        self.entry_presses = 0
+        self.entry_blocked = 0
+        self.display_exit_tried = False
+        self.pending_exit = None
 
     # -- choosing --------------------------------------------------------------------------
 
@@ -156,7 +177,7 @@ class RulePolicy:
             if self.touches >= TOUCH_LIMIT:
                 self._demote()
                 return None
-            tool = self._find(grid, tool_sig)
+            tool = self._find_tool(grid, tool_sig)
             if tool is None:
                 self._demote()
                 return None
@@ -164,7 +185,11 @@ class RulePolicy:
             if choice is not None and choice.reason.startswith("rules: touch"):
                 self.touches += 1
             return choice
-        # matched: try exit candidates, nearest first
+        # matched: the static display itself is the first exit candidate (ls20: walk into the
+        # target box), then other rare objects, nearest first
+        choice = self._enter_display(observation, pair)
+        if choice is not None:
+            return choice
         for cand in self._salient(grid):
             sig = _sig(cand)
             if sig == tool_sig or sig in self.tried_exits or self._in_display(cand, pair):
@@ -177,11 +202,37 @@ class RulePolicy:
         self._demote()
         return None
 
+    def _enter_display(self, observation: Observation, pair) -> ActionChoice | None:
+        """Press into the static display until the avatar is inside it, the presses stop moving
+        it, or the entry budget is spent."""
+        if self.display_exit_tried:
+            return None
+        grid = observation.grid
+        y0, x0, y1, x1 = pair.static_box
+        box = frozenset((y, x) for y in range(y0, y1 + 1) for x in range(x0, x1 + 1))
+        avatar = self.explorer.avatar.avatar_cells(grid)  # type: ignore[union-attr]
+        if avatar <= box or self.entry_presses >= ENTRY_LIMIT or self.entry_blocked >= 2:
+            self.display_exit_tried = True
+            return None
+        target = GridObject(color=int(grid[y0, x0]), size=len(box), bbox=pair.static_box,
+                            centroid=((y0 + y1) / 2, (x0 + x1) / 2), anchor=(y0, x0),
+                            cells=tuple(sorted(box - avatar)))
+        choice = self._touch_or_walk(observation, target, purpose="exit")
+        if choice is None:
+            self.display_exit_tried = True
+            return None
+        if choice.reason.startswith("rules: touch"):
+            self.entry_presses += 1
+            self.pending_exit = avatar
+            self.pending_touch = None  # entering the display is not a tool probe
+        return choice
+
     def _demote(self) -> None:
         self.store.demote_goal(0.3)
         self.diagnostics["hypotheses_demoted"] += 1
         self.touches = 0
         self.tried_exits = set()
+        self._reset_exit()
         self.plan = []
 
     # -- discovery ---------------------------------------------------------------------------
@@ -217,7 +268,7 @@ class RulePolicy:
         for key, vec in vectors.items():
             if cells_ahead(cells, vec) & target_cells:
                 self.plan = []
-                self.pending_touch = (_sig(target), key)
+                self.pending_touch = (_sig(target), key, frozenset(target.cells))
                 return ActionChoice(key, None, None, f"rules: touch {purpose} {_sig(target)[:1]} with key {key}")
         if self.plan and self.plan_goal == (purpose, target.anchor):
             key = self.plan.pop(0)
@@ -261,6 +312,22 @@ class RulePolicy:
             if _sig(o) == signature:
                 return o
         return None
+
+    def _find_tool(self, grid: np.ndarray, signature: tuple) -> GridObject | None:
+        """A tool by signature; when it is hidden under the avatar, where it was last touched."""
+        found = self._find(grid, signature)
+        if found is not None:
+            return found
+        cells = self.tool_cells.get(signature)
+        if not cells:
+            return None
+        avatar = self.explorer.avatar.avatar_cells(grid) if self.explorer.avatar else frozenset()
+        if not (cells & avatar):
+            return None
+        ys = [y for y, _ in cells]; xs = [x for _, x in cells]
+        return GridObject(color=signature[0], size=len(cells), bbox=(min(ys), min(xs), max(ys), max(xs)),
+                          centroid=(sum(ys) / len(ys), sum(xs) / len(xs)), anchor=min(cells),
+                          cells=tuple(sorted(cells)))
 
     @staticmethod
     def _in_display(o: GridObject, pair) -> bool:
