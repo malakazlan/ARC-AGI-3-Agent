@@ -189,3 +189,8 @@ Consequences, all measured locally:
 5. The framework runs all games in parallel threads; a global deadline must be shared.
 6. Unavailable actions are silent no-ops locally, so they waste nothing locally but may be
    400s online. Always filter by `available_actions`.
+7. A level can restart without GAME_OVER. ls20: when the energy bar empties, five animation
+   frames flash the whole grid in the bar's colour, then the level's start frame returns with
+   one digit of the bottom-right attempts counter consumed; `state` stays NOT_FINISHED.
+   GAME_OVER only comes when the attempts are gone. Death detection must not rely on `state`
+   alone. `[measured 2026-09-18, ls20 L2 t44]`

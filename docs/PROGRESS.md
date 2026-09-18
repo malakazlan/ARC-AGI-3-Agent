@@ -104,3 +104,15 @@ Dev machine: i5-7300HQ, 4 cores, 7.7 GB RAM in WSL. Benchmarks with many seeds w
   goal can make unnecessary. Owner's ls20 play notes recorded in `docs/HUMAN_PLAY.md`.
 - Next: step 3, win hypotheses (reach colour, click colour, remove all, make region A equal
   region B) carried across levels and planned over predicted states.
+
+## 2026-09-18 — Step 3 (rule policy), checkpoint
+
+- Built behind `policy: rules` (`arc3/agent_v2.py`, `arc3/rules/`): events from diffs, rule
+  store, scale-free display resemblance, discovery by touching salient objects (compound
+  icons), T1 match_display exploit with the target display as exit, goal carried across
+  levels. Bar detector fixed for refilling bars without masking the player's trail. 192 tests.
+- ls20 level 1: 23 actions (was 887 with the explorer; acceptance <= 60 met). Level 2 not yet:
+  the level restarts silently when the energy bar empties (no GAME_OVER), which nothing
+  detects; energy and refills are the next mechanic.
+- Dev benches running: rule policy vs explorer (no-regression check) and the explorer with the
+  fixed detector (to locate the 9 -> 5 drop: cn04, su15, tu93).

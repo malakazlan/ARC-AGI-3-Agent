@@ -105,3 +105,31 @@ Implementation details belong in DECISIONS.md, not here. Mark unverified beliefs
   goal every new state is worth a visit. The owner's ls20 notes say the same from the other
   side: after level 1 a human spends zero actions on known rules because the goal tells them
   which states matter. The next lever is the goal, not more prediction.
+- 2026-09-18 (step 3, ls20 autopsies with the rule policy) — Level 1 of ls20 falls from 887 to
+  23 actions once four things a human takes for granted are in the loop. (1) Resemblance is
+  scale-free: the target glyph is drawn at 1x in a 7x7 box, the panel at 2x in a 10x10 box;
+  pairing by frame colour and comparing normalized shapes finds the pair where box-size
+  matching did not. (2) The exit is the target display itself: the matched avatar walks into
+  the box (two presses), no separate exit object exists. (3) The avatar drawn inside the target
+  is not a change of the target: progress must be held while the avatar overlaps a display,
+  otherwise the policy reads "mismatch" and walks back to the dial (this alone cost 4 wasted
+  round trips). (4) Small touching pieces of different colours are one object: the rotator is
+  a 0/1 icon that segmentation splits in three; probing its pieces as separate tools and
+  "exits" rotated the panel away from the match twice. Verified: with all four, one touch,
+  one walk, two presses.
+- 2026-09-18 (ls20 level 2 frames) — Not every death is a GAME_OVER. On ls20 an empty energy
+  bar restarts the level in place: a full-frame flash of the bar's colour over five animation
+  frames, avatar and panel back at the level start, one digit of the bottom-right attempts
+  counter consumed, state still NOT_FINISHED. Level 2 also drains about two bar cells per
+  action and offers refill objects drawn in the bar's colour. Nothing in the explorer sees this:
+  its budget and death logic key on GAME_OVER, so the rule policy walked a 17-step path to the
+  exit on an empty bar and was reset mid-way, four times. The energy is a resource the planner
+  must read, and the flash-then-start-state pattern is how a silent death is recognised.
+- 2026-09-18 (bar detector on a toy with no bar) — The sequence-based bar detector, needed to
+  find ls20's refilling bar, masked the player's own first steps on a toy with no bar: two
+  deterministic attempts leave the start at the same offsets, and the "first change" comparison
+  with a tolerance of 2 cannot tell that from a drain. Two priors fixed it without losing any
+  real bar (identical masks on all 18 dev games, ls20 856 to 105 states): a bar drains as a
+  front that sweeps monotonically along its long axis, and a cell the avatar has walked over is
+  never a bar. The second is world-model-informed perception: once the avatar is known,
+  perception should use it.

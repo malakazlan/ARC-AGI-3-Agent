@@ -1,8 +1,13 @@
 # 2026-09-18-dials2-dev
 
-- What changed: TODO
-- Result vs baseline: TODO
-- Keep or drop: TODO
+- What changed: dial cap restricted to key dials on avatar games (clicks never capped) after
+  `2026-09-18-dials-breadth-dev` (cap on everything) fell to 4.
+- Result vs baseline: 5 median levels, RHAE 0.39, vs 9 for `2026-09-18-predicted-edges-dev`.
+  Lost: cn04 [0,1,1] -> [0,0,0], su15 [1,1,1] -> [0,1,0], tu93 [1,2,2] -> [0,0,1]. Won by the
+  cap: cn04 ACTION5 710 -> 144 and re86 503 -> 194 re-tests.
+- Keep or drop: keep the cap and breadth-first (ablations `ablate-nocap`, `ablate-nobreadth`
+  both 5: neither flag is the cause). The drop is re-measured with the fixed bar detector in
+  `2026-09-18-detector-fix-dev`.
 
 ```
 game   levels/seed    med lv med score  actions  states  wall s
