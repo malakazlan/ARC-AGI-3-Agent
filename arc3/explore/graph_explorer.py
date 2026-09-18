@@ -495,14 +495,21 @@ class GraphExplorer:
                     continue
                 kept.append(a)
             untested = kept
-        kept = []
-        for a in untested:
-            if a[0] not in MOVE_KEYS and self.dials.confirmed(self.graph.action_class(key, a)):
-                if count:
-                    self.diagnostics["dial_capped"] += 1
-                continue  # a confirmed dial teaches nothing new in a new state
-            kept.append(a)
-        return kept
+        if self._planner_ready():
+            # A confirmed key dial on an avatar game (rotate, recolour) is one axis of a product
+            # space (position x dial state) that the effect model already predicts: pressing it in
+            # every new position teaches nothing. Clicks are never capped: in click games a toggle
+            # is the mechanic itself, and without a goal its states must be visited.
+            kept = []
+            for a in untested:
+                if (a[0] not in MOVE_KEYS and a[0] != COMPLEX_ACTION_ID
+                        and self.dials.confirmed(self.graph.action_class(key, a))):
+                    if count:
+                        self.diagnostics["dial_capped"] += 1
+                    continue
+                kept.append(a)
+            untested = kept
+        return untested
 
     def _has_live_untested(self, key: str) -> bool:
         return bool(self._live_untested(key))
