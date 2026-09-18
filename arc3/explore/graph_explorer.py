@@ -419,6 +419,16 @@ class GraphExplorer:
         self.trace.append(action)
         return ActionChoice(action[0], action[1], action[2], reason)
 
+    def adopt(self, action: ActionKey) -> None:
+        """Another policy chose `action` at the current state: learn from it as if it were ours."""
+        key = self.current_key
+        if key is not None and key in self.graph:
+            self.pending = (key, action)
+        self.expected = self._prediction(action[0]) if action[0] in MOVE_KEYS else None
+        self.plan = []
+        self.move_plan = []
+        self.trace.append(action)
+
     def _pick(self, key: str | None, observation: Observation) -> tuple[ActionKey, str]:
         if key is None or key not in self.graph:
             return self._random_legal(observation), "graph: state not stored"

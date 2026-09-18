@@ -11,7 +11,8 @@ class Arc3Config:
     global_budget_s: float = 5.5 * 3600
     # Hard cap on choices (actions + resets) per game so one game cannot eat the budget.
     max_actions_per_game: int = 2000
-    # Action-selection policy: "graph" (Baseline 1 explorer) or "random" (legal uniform).
+    # Action-selection policy: "graph" (explorer, control), "rules" (v2: discovery + rule store
+    # on top of the explorer) or "random" (legal uniform).
     policy: str = "graph"
     # Graph explorer: node cap per level (memory) and click candidates per state (branching).
     max_nodes_per_level: int = 5000

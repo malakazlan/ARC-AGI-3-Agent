@@ -98,12 +98,16 @@ class Orchestrator:
     @property
     def diagnostics(self) -> dict[str, Any]:
         merged = dict(self._counters)
-        merged.update(getattr(self.policy, "diagnostics", {}))
+        merged.update(getattr(self.policy, "diagnostics_all", None) or getattr(self.policy, "diagnostics", {}))
         return merged
 
     # -- policies --------------------------------------------------------------------------
 
     def _build_policy(self, config: Arc3Config) -> Policy:
+        if config.policy == "rules":
+            from arc3.agent_v2 import RulePolicy  # local import: depends on explore
+
+            return RulePolicy(self.rng, config)
         if config.policy == "graph":
             from arc3.explore import GraphExplorer  # local import: explore depends on types only
 

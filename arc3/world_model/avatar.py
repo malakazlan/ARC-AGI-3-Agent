@@ -15,7 +15,7 @@ import numpy as np
 
 from arc3.perception import find_translations
 
-MIN_VOTES = 3
+MIN_VOTES = 2
 MIN_SHARE = 0.6
 MIN_EXPLAINED = 0.0  # every moved group counts: a small avatar next to a big drifter is normal (sp80)
 MIN_OVERLAP = 0.5    # a partial-appearance move must overlap the tracked avatar this much
