@@ -78,3 +78,43 @@ def test_rule_policy_keeps_using_a_rotator_it_is_standing_on():
     assert game.levels_completed == 1
     assert game.steps <= 60
     assert brain.diagnostics["hypotheses_demoted"] == 0
+
+
+def test_rule_policy_keeps_the_match_while_the_avatar_is_inside_the_target():
+    """ls20: the avatar is drawn inside the target box while entering it. That must not read as
+    'the displays no longer match' and send the policy back to the dial."""
+    game = DisplayToy(deep_target=True)
+    brain, _ = run(game, steps=200)
+    assert game.levels_completed == 1
+    assert game.steps <= 60
+    assert brain.diagnostics["hypotheses_demoted"] == 0
+
+
+def test_rule_policy_treats_a_two_colour_icon_as_one_tool():
+    """ls20's rotator is a two-colour icon. Its pieces are one tool, probed once, never an exit."""
+    game = DisplayToy(compound_rotator=True, exit_in_target=True)
+    brain, _ = run(game, steps=200)
+    assert game.levels_completed == 1
+    assert game.steps <= 60
+    assert brain.diagnostics["probes"] <= 2
+
+
+def test_rule_policy_ignores_ambient_change_when_reading_a_touch():
+    """ls20: the energy bar drains on every action. A bar inside a frame of the panel's colour
+    must not be paired as a display."""
+    game = DisplayToy(bar=True, exit_in_target=True)
+    brain, _ = run(game, steps=200)
+    assert game.levels_completed == 1
+    bar_box = (8, 5, 11, 11)
+    assert all(d["changeable"] != bar_box and d["static"] != bar_box for d in brain.policy.store.displays)
+
+
+def test_rule_policy_carries_the_rule_to_level_two_without_new_probes():
+    """Level 2 moves the target and the rotator. Known rule: no discovery, straight to the dial."""
+    game = DisplayToy(levels=2, exit_in_target=True)
+    brain, log = run(game, steps=300)
+    assert game.levels_completed == 2
+    level1_actions = brain.policy.store.level_paths[0]
+    level2_actions = game.steps - len(level1_actions)
+    assert brain.diagnostics["hypothesis_correct"] >= 1
+    assert level2_actions <= 30, level2_actions

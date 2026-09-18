@@ -28,7 +28,7 @@ MOVE_KEYS = (1, 2, 3, 4)
 SMALL = 16          # cells; larger objects are walls, floors or panels
 RARE = 2            # at most this many objects share a salient signature
 TOUCH_LIMIT = 12    # touches of one dial before the hypothesis is doubted
-ENTRY_LIMIT = 4     # presses into the target display before it is dismissed as the exit
+ENTRY_LIMIT = 6     # presses into the target display before it is dismissed as the exit
 Cells = frozenset[tuple[int, int]]
 
 
@@ -59,6 +59,9 @@ class RulePolicy:
         self.entry_blocked = 0
         self.display_exit_tried = False
         self.touches = 0
+        self.last_progress = 0.0
+        self.prev_changed: frozenset = frozenset()   # cells that changed on the previous action
+        self.goal_needs_anchor = False
         self.last_grid: np.ndarray | None = None
         self._last_levels: int | None = None
         self.diagnostics: dict[str, Any] = {
@@ -78,6 +81,11 @@ class RulePolicy:
         if observation.grid is not None and self.last_grid is not None and self.pending_touch is not None:
             self._read_touch(self.last_grid, observation.grid)
         self.pending_touch = None
+        if observation.grid is not None and self.last_grid is not None and self.last_grid.shape == observation.grid.shape:
+            ys, xs = np.nonzero(observation.grid != self.last_grid)
+            self.prev_changed = frozenset(zip(ys.tolist(), xs.tolist()))
+        else:
+            self.prev_changed = frozenset()
         if self.pending_exit is not None and observation.grid is not None and self.explorer.avatar is not None:
             after = self.explorer.avatar.avatar_cells(observation.grid)
             if after == self.pending_exit:
@@ -96,7 +104,11 @@ class RulePolicy:
         avatar_before = self.explorer.avatar.avatar_cells(before) if self.explorer.avatar else frozenset()
         avatar_after = self.explorer.avatar.last_cells or frozenset()
         touched_cells = set(avatar_before) | set(avatar_after)
-        side = [e for e in extract_events(before, after, mask) if not (set(e.cells) & touched_cells)]
+        # ambient change (an energy bar draining on every action, one cell further each time)
+        # is not an effect of the touch
+        ambient = {(y + dy, x + dx) for (y, x) in self.prev_changed for dy in (-1, 0, 1) for dx in (-1, 0, 1)}
+        side = [e for e in extract_events(before, after, mask)
+                if not (set(e.cells) & touched_cells) and not (set(e.cells) <= ambient)]
         if not side:
             if signature not in self.store.tools:
                 self.store.set_tool(signature, "no_op")
@@ -112,7 +124,10 @@ class RulePolicy:
             if pairs:
                 pair = pairs[0]
                 self.store.displays.append({"changeable": pair.changeable_box, "static": pair.static_box})
-                self.store.propose_goal(Goal("match_display", {"pair": pair, "tool": signature}, confidence=0.6))
+                colours = (int(after[pair.changeable_box[0], pair.changeable_box[1]]),
+                           int(after[pair.static_box[0], pair.static_box[1]]))
+                self.store.propose_goal(Goal("match_display", {"pair": pair, "tool": signature, "colours": colours}, confidence=0.6))
+                self.last_progress = 0.0
                 if self.diagnostics["actions_to_hypothesis"] is None:
                     self.diagnostics["actions_to_hypothesis"] = self._actions
 
@@ -120,6 +135,8 @@ class RulePolicy:
         if self.store.goal is not None:
             self.diagnostics["hypothesis_correct"] += 1
             self.store.goal.confidence = min(0.95, self.store.goal.confidence + 0.2)
+            self.goal_needs_anchor = True   # same rule, new geometry: find the displays again
+        self.last_progress = 0.0
         self.store.record_level_path(levels - 1, list(self.explorer.trace))
         self.store.new_level(levels)
         self.probed = set()
@@ -155,6 +172,8 @@ class RulePolicy:
         if grid is None or not self._avatar_ready(grid):
             self.plan = []
             return None
+        if self.goal_needs_anchor and self.store.goal is not None:
+            self._anchor_goal(grid)
         if self.store.goal is not None and self.store.goal.template == "match_display":
             self.mode = "exploit"
             self.diagnostics["mode"] = "exploit"
@@ -172,7 +191,7 @@ class RulePolicy:
         grid = observation.grid
         goal = self.store.goal
         pair, tool_sig = goal.params["pair"], goal.params["tool"]
-        progress = match_progress(grid, pair)
+        progress = self._progress(grid, pair)
         if progress < 1.0:
             if self.touches >= TOUCH_LIMIT:
                 self._demote()
@@ -202,18 +221,78 @@ class RulePolicy:
         self._demote()
         return None
 
+    def _progress(self, grid: np.ndarray, pair) -> float:
+        """Match progress, held at its last value while the avatar overlaps a display (the
+        avatar drawn inside the target is not a change of the display). A fresh match re-arms
+        the display exit."""
+        avatar = self.explorer.avatar.avatar_cells(grid) if self.explorer.avatar else frozenset()
+        for (y0, x0, y1, x1) in (pair.changeable_box, pair.static_box):
+            if any(y0 <= y <= y1 and x0 <= x <= x1 for (y, x) in avatar):
+                return self.last_progress
+        progress = match_progress(grid, pair)
+        if progress >= 1.0 and self.last_progress < 1.0:
+            self._reset_exit()
+        self.last_progress = progress
+        return progress
+
+    def _anchor_goal(self, grid: np.ndarray) -> None:
+        """On a new level, find the displays of the carried goal again: frames of the same
+        colour and box size as before. Ambiguous or missing: the goal is dropped, discovery
+        resumes with the tools still known."""
+        from arc3.rules.resemblance import DisplayPair, _frames
+
+        self.goal_needs_anchor = False
+        goal = self.store.goal
+        old = goal.params["pair"]
+        vals, counts = np.unique(grid, return_counts=True)
+        bg = int(vals[int(np.argmax(counts))])
+        frames = _frames(grid, bg)
+
+        def same(box, colour):
+            y0, x0, y1, x1 = box
+            return [f for f in frames if int(f.color) == colour
+                    and (f.bbox[2] - f.bbox[0], f.bbox[3] - f.bbox[1]) == (y1 - y0, x1 - x0)]
+
+        c_colour, s_colour = goal.params.get("colours", (None, None))
+        changeable = same(old.changeable_box, c_colour) if c_colour is not None else []
+        taken = {c.bbox for c in changeable}
+        static = [f for f in same(old.static_box, s_colour) if f.bbox not in taken] if s_colour is not None else []
+        if len(changeable) == 1 and len(static) == 1:
+            goal.params["pair"] = DisplayPair(changeable[0].bbox, static[0].bbox, old.score)
+            self.store.displays.append({"changeable": changeable[0].bbox, "static": static[0].bbox})
+            self.diagnostics["goals_carried"] = self.diagnostics.get("goals_carried", 0) + 1
+        else:
+            self.store.goal = None
+            self.diagnostics["goals_dropped_on_level"] = self.diagnostics.get("goals_dropped_on_level", 0) + 1
+
     def _enter_display(self, observation: Observation, pair) -> ActionChoice | None:
-        """Press into the static display until the avatar is inside it, the presses stop moving
-        it, or the entry budget is spent."""
+        """Press into the static display, towards its centre, until the avatar covers the
+        centre, the presses stop moving it, or the entry budget is spent."""
         if self.display_exit_tried:
             return None
         grid = observation.grid
         y0, x0, y1, x1 = pair.static_box
         box = frozenset((y, x) for y in range(y0, y1 + 1) for x in range(x0, x1 + 1))
+        centre = ((y0 + y1) // 2, (x0 + x1) // 2)
         avatar = self.explorer.avatar.avatar_cells(grid)  # type: ignore[union-attr]
-        if avatar <= box or self.entry_presses >= ENTRY_LIMIT or self.entry_blocked >= 2:
+        if centre in avatar or self.entry_presses >= ENTRY_LIMIT or self.entry_blocked >= 2:
             self.display_exit_tried = True
             return None
+        # adjacent or inside: the press that brings the avatar closest to the centre
+        best = None
+        for key, vec in self.explorer._known_vectors().items():
+            if not (cells_ahead(avatar, vec) & box):
+                continue
+            moved = {(y + vec[0], x + vec[1]) for (y, x) in avatar}
+            cy = sum(y for y, _ in moved) / len(moved); cx = sum(x for _, x in moved) / len(moved)
+            dist = abs(cy - centre[0]) + abs(cx - centre[1])
+            if best is None or dist < best[0]:
+                best = (dist, key)
+        if best is not None:
+            self.plan = []
+            self.entry_presses += 1
+            self.pending_exit = avatar
+            return ActionChoice(best[1], None, None, f"rules: touch exit (display) with key {best[1]}")
         target = GridObject(color=int(grid[y0, x0]), size=len(box), bbox=pair.static_box,
                             centroid=((y0 + y1) / 2, (x0 + x1) / 2), anchor=(y0, x0),
                             cells=tuple(sorted(box - avatar)))
@@ -221,10 +300,6 @@ class RulePolicy:
         if choice is None:
             self.display_exit_tried = True
             return None
-        if choice.reason.startswith("rules: touch"):
-            self.entry_presses += 1
-            self.pending_exit = avatar
-            self.pending_touch = None  # entering the display is not a tool probe
         return choice
 
     def _demote(self) -> None:
@@ -282,11 +357,51 @@ class RulePolicy:
         key = self.plan.pop(0)
         return ActionChoice(key, None, None, f"rules: walk to {purpose} ({len(self.plan)} left)")
 
+    def _objects(self, grid: np.ndarray, avatar: Cells) -> list[GridObject]:
+        """Objects with small touching pieces of different colours merged into one: a two-colour
+        icon is one thing to a player. The avatar is never merged with anything."""
+        objects = segment_objects(grid)
+
+        def piece(o: GridObject) -> bool:
+            y0, x0, y1, x1 = o.bbox
+            hollow = (y1 - y0 + 1) * (x1 - x0 + 1) > o.size and o.size >= 6
+            return o.size <= SMALL and not hollow and not (set(o.cells) & avatar)
+
+        small = [o for o in objects if piece(o)]
+        big = [o for o in objects if not piece(o)]
+        groups: list[list[GridObject]] = []
+        for o in small:
+            y0, x0, y1, x1 = o.bbox
+            joined = None
+            for g in groups:
+                if any(gy0 - 1 <= y1 and y0 <= gy1 + 1 and gx0 - 1 <= x1 and x0 <= gx1 + 1
+                       for (gy0, gx0, gy1, gx1) in (m.bbox for m in g)):
+                    if joined is None:
+                        g.append(o); joined = g
+                    else:
+                        joined.extend(g); g.clear()
+            if joined is None:
+                groups.append([o])
+        out = list(big)
+        for g in groups:
+            if not g:
+                continue
+            if len(g) == 1:
+                out.append(g[0]); continue
+            cells = tuple(sorted(c for m in g for c in m.cells))
+            ys = [y for y, _ in cells]; xs = [x for _, x in cells]
+            colour = max(g, key=lambda m: m.size).color
+            cy, cx = sum(ys) / len(ys), sum(xs) / len(xs)
+            anchor = min(cells, key=lambda c: abs(c[0] - cy) + abs(c[1] - cx))
+            out.append(GridObject(color=int(colour), size=len(cells), bbox=(min(ys), min(xs), max(ys), max(xs)),
+                                  centroid=(cy, cx), anchor=anchor, cells=cells))
+        return out
+
     def _salient(self, grid: np.ndarray) -> list[GridObject]:
         """Rare, small, static objects, nearest to the avatar first."""
         ex = self.explorer
         avatar = ex.avatar.avatar_cells(grid) if ex.avatar else frozenset()
-        objects = segment_objects(grid)
+        objects = self._objects(grid, avatar)
         counts: dict[tuple, int] = {}
         for o in objects:
             counts[_sig(o)] = counts.get(_sig(o), 0) + 1
@@ -308,7 +423,8 @@ class RulePolicy:
         return out
 
     def _find(self, grid: np.ndarray, signature: tuple) -> GridObject | None:
-        for o in segment_objects(grid):
+        avatar = self.explorer.avatar.avatar_cells(grid) if self.explorer.avatar else frozenset()
+        for o in self._objects(grid, avatar):
             if _sig(o) == signature:
                 return o
         return None
