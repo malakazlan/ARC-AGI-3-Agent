@@ -139,3 +139,15 @@ Dev machine: i5-7300HQ, 4 cores, 7.7 GB RAM in WSL. Benchmarks with many seeds w
   0 fallbacks, 0 tracebacks). `make submit` is the owner's step.
 - Open: ls20 L3 (consumable refills, needs the subgoal plan), click games' true waste (su15
   75%, sp80 51%), tu93's sensitivity to the opening order, cn04.
+
+## 2026-09-18 — Evening: research pass and world-model fixes
+
+- Docs: `docs/PRIOR_WORK.md` (9 sources against our traces), `docs/BOTTLENECKS.md` (8 failure
+  classes, ranked builds), `docs/GAMES.md` and `docs/GAME_CENSUS.md` (what is known and
+  measured about all 25 public games), `eval/trace_probes.py` (waste rules and win templates).
+- Built from the tu93 autopsy: swept-path passability, shape-tolerant avatar identity with
+  the vacated-tile filter, lethal presses forbidden in plans. 206 tests.
+- Dev, 3 seeds: **13 median levels, RHAE 1.36** (morning 9 / 0.37; midday 11 / 1.20).
+- Parallel benchmark runner: `make bench` uses 4 workers.
+- Next by the bottleneck ranking: the count-to-zero goal template (win probe: 3 of 10 wins),
+  the click dead-signature rule, then the subgoal plan with energy for ls20 L3.

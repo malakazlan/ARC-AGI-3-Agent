@@ -1,0 +1,992 @@
+{
+  "experiment_id": "2026-09-18-traces-rules",
+  "date": "2026-09-18",
+  "git": "703fc02",
+  "bench": {
+    "bench_games": [
+      "cn04",
+      "ft09",
+      "g50t",
+      "ka59",
+      "lp85",
+      "ls20",
+      "m0r0",
+      "r11l",
+      "re86",
+      "s5i5",
+      "sb26",
+      "sc25",
+      "sk48",
+      "sp80",
+      "su15",
+      "tu93",
+      "vc33",
+      "wa30"
+    ],
+    "bench_seeds": [
+      0
+    ],
+    "bench_max_actions": 1000,
+    "bench_time_per_game_s": 300.0,
+    "bench_overrides": {}
+  },
+  "config_defaults": {
+    "seed": 0,
+    "global_budget_s": 19800.0,
+    "max_actions_per_game": 2000,
+    "policy": "rules",
+    "max_nodes_per_level": 5000,
+    "max_click_candidates": 64,
+    "countdown_mask": true,
+    "budget_aware": true,
+    "action_prior": true,
+    "planner": true,
+    "planner_max_mismatches": 3,
+    "effects": true,
+    "dial_cap": false,
+    "breadth_first": true,
+    "reasoner_enabled": false
+  },
+  "runs": [
+    {
+      "game_id": "cn04",
+      "seed": 0,
+      "levels_completed": 0,
+      "win_levels": 6,
+      "actions": 1000,
+      "level_actions": [
+        1000,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "level_scores": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "score": 0.0,
+      "state": "GAME_OVER",
+      "wall_s": 22.85,
+      "states": 581,
+      "edges": 1046,
+      "inconsistent": 1,
+      "exhausted": 0,
+      "capped": 0,
+      "resets": 13,
+      "fallbacks": 0,
+      "retests_avoided": 784,
+      "planned_moves": 4,
+      "mismatches": 0,
+      "planner_resets": 0,
+      "avatar_known_at": 2,
+      "budget_deaths": 13
+    },
+    {
+      "game_id": "ft09",
+      "seed": 0,
+      "levels_completed": 0,
+      "win_levels": 6,
+      "actions": 1000,
+      "level_actions": [
+        1000,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "level_scores": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "score": 0.0,
+      "state": "GAME_OVER",
+      "wall_s": 9.79,
+      "states": 37,
+      "edges": 3225,
+      "inconsistent": 0,
+      "exhausted": 877,
+      "capped": 0,
+      "resets": 1,
+      "fallbacks": 0,
+      "retests_avoided": 0,
+      "planned_moves": 0,
+      "mismatches": 0,
+      "planner_resets": 0,
+      "avatar_known_at": null,
+      "budget_deaths": 0
+    },
+    {
+      "game_id": "g50t",
+      "seed": 0,
+      "levels_completed": 0,
+      "win_levels": 7,
+      "actions": 1000,
+      "level_actions": [
+        1000,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "level_scores": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "score": 0.0,
+      "state": "GAME_OVER",
+      "wall_s": 36.08,
+      "states": 18,
+      "edges": 69,
+      "inconsistent": 5,
+      "exhausted": 0,
+      "capped": 0,
+      "resets": 7,
+      "fallbacks": 0,
+      "retests_avoided": 59,
+      "planned_moves": 470,
+      "mismatches": 3,
+      "planner_resets": 0,
+      "avatar_known_at": 8,
+      "budget_deaths": 7
+    },
+    {
+      "game_id": "ka59",
+      "seed": 0,
+      "levels_completed": 0,
+      "win_levels": 7,
+      "actions": 1000,
+      "level_actions": [
+        1000,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "level_scores": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "score": 0.0,
+      "state": "GAME_OVER",
+      "wall_s": 20.88,
+      "states": 280,
+      "edges": 2862,
+      "inconsistent": 0,
+      "exhausted": 16,
+      "capped": 0,
+      "resets": 9,
+      "fallbacks": 0,
+      "retests_avoided": 1808,
+      "planned_moves": 4,
+      "mismatches": 25,
+      "planner_resets": 0,
+      "avatar_known_at": 5,
+      "budget_deaths": 9
+    },
+    {
+      "game_id": "lp85",
+      "seed": 0,
+      "levels_completed": 1,
+      "win_levels": 8,
+      "actions": 1000,
+      "level_actions": [
+        19,
+        981,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "level_scores": [
+        80.06,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "score": 2.224,
+      "state": "NOT_FINISHED",
+      "wall_s": 2.5,
+      "states": 16,
+      "edges": 1952,
+      "inconsistent": 0,
+      "exhausted": 946,
+      "capped": 0,
+      "resets": 0,
+      "fallbacks": 0,
+      "retests_avoided": 0,
+      "planned_moves": 0,
+      "mismatches": 0,
+      "planner_resets": 0,
+      "avatar_known_at": null,
+      "budget_deaths": 0
+    },
+    {
+      "game_id": "ls20",
+      "seed": 0,
+      "levels_completed": 2,
+      "win_levels": 7,
+      "actions": 1000,
+      "level_actions": [
+        25,
+        45,
+        930,
+        0,
+        0,
+        0,
+        0
+      ],
+      "level_scores": [
+        77.44,
+        115.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "score": 10.714,
+      "state": "GAME_OVER",
+      "wall_s": 43.14,
+      "states": 168,
+      "edges": 183,
+      "inconsistent": 0,
+      "exhausted": 0,
+      "capped": 0,
+      "resets": 4,
+      "fallbacks": 0,
+      "retests_avoided": 17,
+      "planned_moves": 0,
+      "mismatches": 30,
+      "planner_resets": 0,
+      "avatar_known_at": 7,
+      "budget_deaths": 14
+    },
+    {
+      "game_id": "m0r0",
+      "seed": 0,
+      "levels_completed": 0,
+      "win_levels": 6,
+      "actions": 1000,
+      "level_actions": [
+        1000,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "level_scores": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "score": 0.0,
+      "state": "GAME_OVER",
+      "wall_s": 20.94,
+      "states": 43,
+      "edges": 413,
+      "inconsistent": 0,
+      "exhausted": 0,
+      "capped": 0,
+      "resets": 6,
+      "fallbacks": 0,
+      "retests_avoided": 1524,
+      "planned_moves": 1,
+      "mismatches": 1,
+      "planner_resets": 0,
+      "avatar_known_at": 2,
+      "budget_deaths": 4
+    },
+    {
+      "game_id": "r11l",
+      "seed": 0,
+      "levels_completed": 1,
+      "win_levels": 6,
+      "actions": 1000,
+      "level_actions": [
+        9,
+        991,
+        0,
+        0,
+        0,
+        0
+      ],
+      "level_scores": [
+        115.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "score": 4.762,
+      "state": "GAME_OVER",
+      "wall_s": 10.97,
+      "states": 458,
+      "edges": 953,
+      "inconsistent": 0,
+      "exhausted": 0,
+      "capped": 0,
+      "resets": 27,
+      "fallbacks": 0,
+      "retests_avoided": 0,
+      "planned_moves": 0,
+      "mismatches": 0,
+      "planner_resets": 0,
+      "avatar_known_at": null,
+      "budget_deaths": 10
+    },
+    {
+      "game_id": "re86",
+      "seed": 0,
+      "levels_completed": 0,
+      "win_levels": 8,
+      "actions": 1000,
+      "level_actions": [
+        1000,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "level_scores": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "score": 0.0,
+      "state": "GAME_OVER",
+      "wall_s": 11.68,
+      "states": 521,
+      "edges": 1513,
+      "inconsistent": 0,
+      "exhausted": 103,
+      "capped": 0,
+      "resets": 9,
+      "fallbacks": 0,
+      "retests_avoided": 1319,
+      "planned_moves": 44,
+      "mismatches": 58,
+      "planner_resets": 0,
+      "avatar_known_at": 2,
+      "budget_deaths": 9
+    },
+    {
+      "game_id": "s5i5",
+      "seed": 0,
+      "levels_completed": 0,
+      "win_levels": 8,
+      "actions": 1000,
+      "level_actions": [
+        1000,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "level_scores": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "score": 0.0,
+      "state": "GAME_OVER",
+      "wall_s": 2.86,
+      "states": 120,
+      "edges": 831,
+      "inconsistent": 0,
+      "exhausted": 0,
+      "capped": 0,
+      "resets": 19,
+      "fallbacks": 0,
+      "retests_avoided": 0,
+      "planned_moves": 0,
+      "mismatches": 0,
+      "planner_resets": 0,
+      "avatar_known_at": null,
+      "budget_deaths": 19
+    },
+    {
+      "game_id": "sb26",
+      "seed": 0,
+      "levels_completed": 0,
+      "win_levels": 8,
+      "actions": 1000,
+      "level_actions": [
+        1000,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "level_scores": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "score": 0.0,
+      "state": "GAME_OVER",
+      "wall_s": 23.92,
+      "states": 5,
+      "edges": 413,
+      "inconsistent": 0,
+      "exhausted": 835,
+      "capped": 0,
+      "resets": 5,
+      "fallbacks": 0,
+      "retests_avoided": 0,
+      "planned_moves": 0,
+      "mismatches": 0,
+      "planner_resets": 0,
+      "avatar_known_at": null,
+      "budget_deaths": 4
+    },
+    {
+      "game_id": "sc25",
+      "seed": 0,
+      "levels_completed": 2,
+      "win_levels": 6,
+      "actions": 1000,
+      "level_actions": [
+        94,
+        70,
+        836,
+        0,
+        0,
+        0
+      ],
+      "level_scores": [
+        14.67,
+        0.73,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "score": 0.768,
+      "state": "GAME_OVER",
+      "wall_s": 16.57,
+      "states": 468,
+      "edges": 1964,
+      "inconsistent": 0,
+      "exhausted": 0,
+      "capped": 0,
+      "resets": 18,
+      "fallbacks": 0,
+      "retests_avoided": 1379,
+      "planned_moves": 0,
+      "mismatches": 0,
+      "planner_resets": 0,
+      "avatar_known_at": 8,
+      "budget_deaths": 18
+    },
+    {
+      "game_id": "sk48",
+      "seed": 0,
+      "levels_completed": 0,
+      "win_levels": 8,
+      "actions": 1000,
+      "level_actions": [
+        1000,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "level_scores": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "score": 0.0,
+      "state": "GAME_OVER",
+      "wall_s": 14.5,
+      "states": 250,
+      "edges": 7639,
+      "inconsistent": 2,
+      "exhausted": 0,
+      "capped": 0,
+      "resets": 3,
+      "fallbacks": 0,
+      "retests_avoided": 82,
+      "planned_moves": 5,
+      "mismatches": 3,
+      "planner_resets": 1,
+      "avatar_known_at": 10,
+      "budget_deaths": 3
+    },
+    {
+      "game_id": "sp80",
+      "seed": 0,
+      "levels_completed": 1,
+      "win_levels": 6,
+      "actions": 1000,
+      "level_actions": [
+        22,
+        978,
+        0,
+        0,
+        0,
+        0
+      ],
+      "level_scores": [
+        115.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "score": 4.762,
+      "state": "GAME_OVER",
+      "wall_s": 15.93,
+      "states": 446,
+      "edges": 888,
+      "inconsistent": 0,
+      "exhausted": 0,
+      "capped": 0,
+      "resets": 24,
+      "fallbacks": 0,
+      "retests_avoided": 353,
+      "planned_moves": 25,
+      "mismatches": 7,
+      "planner_resets": 1,
+      "avatar_known_at": 5,
+      "budget_deaths": 19
+    },
+    {
+      "game_id": "su15",
+      "seed": 0,
+      "levels_completed": 1,
+      "win_levels": 9,
+      "actions": 1000,
+      "level_actions": [
+        444,
+        556,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "level_scores": [
+        0.25,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "score": 0.005,
+      "state": "GAME_OVER",
+      "wall_s": 8.35,
+      "states": 183,
+      "edges": 1427,
+      "inconsistent": 4,
+      "exhausted": 39,
+      "capped": 0,
+      "resets": 21,
+      "fallbacks": 0,
+      "retests_avoided": 0,
+      "planned_moves": 0,
+      "mismatches": 0,
+      "planner_resets": 0,
+      "avatar_known_at": null,
+      "budget_deaths": 18
+    },
+    {
+      "game_id": "tu93",
+      "seed": 0,
+      "levels_completed": 0,
+      "win_levels": 9,
+      "actions": 1000,
+      "level_actions": [
+        1000,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "level_scores": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "score": 0.0,
+      "state": "GAME_OVER",
+      "wall_s": 20.93,
+      "states": 47,
+      "edges": 188,
+      "inconsistent": 0,
+      "exhausted": 779,
+      "capped": 0,
+      "resets": 19,
+      "fallbacks": 0,
+      "retests_avoided": 176,
+      "planned_moves": 45,
+      "mismatches": 108,
+      "planner_resets": 0,
+      "avatar_known_at": 9,
+      "budget_deaths": 19
+    },
+    {
+      "game_id": "vc33",
+      "seed": 0,
+      "levels_completed": 2,
+      "win_levels": 7,
+      "actions": 1000,
+      "level_actions": [
+        44,
+        25,
+        931,
+        0,
+        0,
+        0,
+        0
+      ],
+      "level_scores": [
+        2.53,
+        51.84,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "score": 3.793,
+      "state": "GAME_OVER",
+      "wall_s": 4.38,
+      "states": 324,
+      "edges": 881,
+      "inconsistent": 0,
+      "exhausted": 0,
+      "capped": 0,
+      "resets": 12,
+      "fallbacks": 0,
+      "retests_avoided": 0,
+      "planned_moves": 0,
+      "mismatches": 0,
+      "planner_resets": 0,
+      "avatar_known_at": null,
+      "budget_deaths": 12
+    },
+    {
+      "game_id": "wa30",
+      "seed": 0,
+      "levels_completed": 0,
+      "win_levels": 9,
+      "actions": 1000,
+      "level_actions": [
+        1000,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "level_scores": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "score": 0.0,
+      "state": "GAME_OVER",
+      "wall_s": 11.61,
+      "states": 454,
+      "edges": 948,
+      "inconsistent": 0,
+      "exhausted": 0,
+      "capped": 0,
+      "resets": 4,
+      "fallbacks": 0,
+      "retests_avoided": 306,
+      "planned_moves": 17,
+      "mismatches": 0,
+      "planner_resets": 0,
+      "avatar_known_at": 21,
+      "budget_deaths": 4
+    }
+  ],
+  "summary": {
+    "games": 18,
+    "seeds": 1,
+    "sum_median_levels": 10,
+    "mean_median_score": 1.5,
+    "actions_per_completed_level": 1800.0,
+    "total_wall_s": 297.9,
+    "fallbacks": 0,
+    "per_game": {
+      "cn04": {
+        "levels": [
+          0
+        ],
+        "median_levels": 0,
+        "median_score": 0.0,
+        "mean_actions": 1000,
+        "mean_wall_s": 22.85,
+        "mean_states": 581
+      },
+      "ft09": {
+        "levels": [
+          0
+        ],
+        "median_levels": 0,
+        "median_score": 0.0,
+        "mean_actions": 1000,
+        "mean_wall_s": 9.79,
+        "mean_states": 37
+      },
+      "g50t": {
+        "levels": [
+          0
+        ],
+        "median_levels": 0,
+        "median_score": 0.0,
+        "mean_actions": 1000,
+        "mean_wall_s": 36.08,
+        "mean_states": 18
+      },
+      "ka59": {
+        "levels": [
+          0
+        ],
+        "median_levels": 0,
+        "median_score": 0.0,
+        "mean_actions": 1000,
+        "mean_wall_s": 20.88,
+        "mean_states": 280
+      },
+      "lp85": {
+        "levels": [
+          1
+        ],
+        "median_levels": 1,
+        "median_score": 2.22,
+        "mean_actions": 1000,
+        "mean_wall_s": 2.5,
+        "mean_states": 16
+      },
+      "ls20": {
+        "levels": [
+          2
+        ],
+        "median_levels": 2,
+        "median_score": 10.71,
+        "mean_actions": 1000,
+        "mean_wall_s": 43.14,
+        "mean_states": 168
+      },
+      "m0r0": {
+        "levels": [
+          0
+        ],
+        "median_levels": 0,
+        "median_score": 0.0,
+        "mean_actions": 1000,
+        "mean_wall_s": 20.94,
+        "mean_states": 43
+      },
+      "r11l": {
+        "levels": [
+          1
+        ],
+        "median_levels": 1,
+        "median_score": 4.76,
+        "mean_actions": 1000,
+        "mean_wall_s": 10.97,
+        "mean_states": 458
+      },
+      "re86": {
+        "levels": [
+          0
+        ],
+        "median_levels": 0,
+        "median_score": 0.0,
+        "mean_actions": 1000,
+        "mean_wall_s": 11.68,
+        "mean_states": 521
+      },
+      "s5i5": {
+        "levels": [
+          0
+        ],
+        "median_levels": 0,
+        "median_score": 0.0,
+        "mean_actions": 1000,
+        "mean_wall_s": 2.86,
+        "mean_states": 120
+      },
+      "sb26": {
+        "levels": [
+          0
+        ],
+        "median_levels": 0,
+        "median_score": 0.0,
+        "mean_actions": 1000,
+        "mean_wall_s": 23.92,
+        "mean_states": 5
+      },
+      "sc25": {
+        "levels": [
+          2
+        ],
+        "median_levels": 2,
+        "median_score": 0.77,
+        "mean_actions": 1000,
+        "mean_wall_s": 16.57,
+        "mean_states": 468
+      },
+      "sk48": {
+        "levels": [
+          0
+        ],
+        "median_levels": 0,
+        "median_score": 0.0,
+        "mean_actions": 1000,
+        "mean_wall_s": 14.5,
+        "mean_states": 250
+      },
+      "sp80": {
+        "levels": [
+          1
+        ],
+        "median_levels": 1,
+        "median_score": 4.76,
+        "mean_actions": 1000,
+        "mean_wall_s": 15.93,
+        "mean_states": 446
+      },
+      "su15": {
+        "levels": [
+          1
+        ],
+        "median_levels": 1,
+        "median_score": 0.01,
+        "mean_actions": 1000,
+        "mean_wall_s": 8.35,
+        "mean_states": 183
+      },
+      "tu93": {
+        "levels": [
+          0
+        ],
+        "median_levels": 0,
+        "median_score": 0.0,
+        "mean_actions": 1000,
+        "mean_wall_s": 20.93,
+        "mean_states": 47
+      },
+      "vc33": {
+        "levels": [
+          2
+        ],
+        "median_levels": 2,
+        "median_score": 3.79,
+        "mean_actions": 1000,
+        "mean_wall_s": 4.38,
+        "mean_states": 324
+      },
+      "wa30": {
+        "levels": [
+          0
+        ],
+        "median_levels": 0,
+        "median_score": 0.0,
+        "mean_actions": 1000,
+        "mean_wall_s": 11.61,
+        "mean_states": 454
+      }
+    }
+  },
+  "total_wall_s": 302.4
+}

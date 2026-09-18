@@ -159,3 +159,22 @@ Implementation details belong in DECISIONS.md, not here. Mark unverified beliefs
   drawn in the bar's colour. Two priors that generalise: small touching pieces of different
   colours are one object; the colour of a resource's display is the colour of the objects that
   restore it.
+- 2026-09-18 (tu93 autopsy, `2026-09-18-swept-final-dev`) — Three assumptions in the world
+  model were one-cell-step assumptions, and 13 of the 16 keyboard games step 2 to 7 cells.
+  (1) A blocked press was blamed on the landing cells' colour; the obstacle was the wall in
+  between, so corridors were learned as walls. The press stops at the first obstacle along
+  the sweep, so that footprint takes the blame and a successful move clears every colour it
+  crossed. (2) The avatar's exact shape key changed as its ring turned, so its motion was
+  never matched and a one-cell mark riding on it, or the floor tile it vacated (moving by the
+  opposite vector), got elected instead. Identity for election is colour and size; the
+  vacated tile is the more numerous of two objects that swap places. (3) A plan that walked
+  into the pursuer and ended the game was replanned identically after every reset, because
+  the planner knew positions and colours but not deaths. A (position, key) that ended the
+  game is forbidden in later plans. Together: tu93 0-2 -> 3 levels, cn04 recovered,
+  dev 11 -> 13 median levels, RHAE 1.20 -> 1.36.
+- 2026-09-18 (trace probes, `eval/trace_probes.py`) — On the current agent's traces, 19% of
+  actions change nothing, 12% change only the step bar, 4% are clicks on a class that never
+  responded. Of the 10 level-ups recorded, count-to-zero holds before 3, a region became
+  uniform before 4, two frames became equal before 2 (vc33), a class count dropped before 1.
+  The waste on g50t (90% bar-only) is not a rule problem: the agent ping-pongs between two
+  positions because it has no goal, which is the template problem again.

@@ -1,0 +1,139 @@
+{
+  "waste": {
+    "actions": 17588,
+    "ambient_cells": 1163,
+    "no_impact": 2098,
+    "no_change": 3288,
+    "dead_click": 649
+  },
+  "wins": [
+    {
+      "game": "lp85",
+      "level": 1,
+      "actions_in_level": 19,
+      "count_to_zero": [],
+      "count_dropped": [],
+      "equal_frames": 0,
+      "uniform_region": false,
+      "cells_changed_by_win_action": 1524
+    },
+    {
+      "game": "ls20",
+      "level": 1,
+      "actions_in_level": 25,
+      "count_to_zero": [],
+      "count_dropped": [],
+      "equal_frames": 0,
+      "uniform_region": false,
+      "cells_changed_by_win_action": 1483
+    },
+    {
+      "game": "ls20",
+      "level": 2,
+      "actions_in_level": 45,
+      "count_to_zero": [
+        [
+          11,
+          8
+        ],
+        [
+          3,
+          1
+        ]
+      ],
+      "count_dropped": [],
+      "equal_frames": 0,
+      "uniform_region": true,
+      "cells_changed_by_win_action": 1421
+    },
+    {
+      "game": "r11l",
+      "level": 1,
+      "actions_in_level": 9,
+      "count_to_zero": [],
+      "count_dropped": [
+        [
+          15,
+          1
+        ],
+        [
+          1,
+          1
+        ]
+      ],
+      "equal_frames": 0,
+      "uniform_region": false,
+      "cells_changed_by_win_action": 1418
+    },
+    {
+      "game": "sc25",
+      "level": 1,
+      "actions_in_level": 94,
+      "count_to_zero": [
+        [
+          0,
+          9
+        ]
+      ],
+      "count_dropped": [],
+      "equal_frames": 0,
+      "uniform_region": true,
+      "cells_changed_by_win_action": 433
+    },
+    {
+      "game": "sc25",
+      "level": 2,
+      "actions_in_level": 70,
+      "count_to_zero": [
+        [
+          0,
+          9
+        ]
+      ],
+      "count_dropped": [],
+      "equal_frames": 0,
+      "uniform_region": true,
+      "cells_changed_by_win_action": 559
+    },
+    {
+      "game": "sp80",
+      "level": 1,
+      "actions_in_level": 22,
+      "count_to_zero": [],
+      "count_dropped": [],
+      "equal_frames": 0,
+      "uniform_region": true,
+      "cells_changed_by_win_action": 1168
+    },
+    {
+      "game": "su15",
+      "level": 1,
+      "actions_in_level": 444,
+      "count_to_zero": [],
+      "count_dropped": [],
+      "equal_frames": 0,
+      "uniform_region": false,
+      "cells_changed_by_win_action": 309
+    },
+    {
+      "game": "vc33",
+      "level": 1,
+      "actions_in_level": 44,
+      "count_to_zero": [],
+      "count_dropped": [],
+      "equal_frames": 1,
+      "uniform_region": false,
+      "cells_changed_by_win_action": 2795
+    },
+    {
+      "game": "vc33",
+      "level": 2,
+      "actions_in_level": 25,
+      "count_to_zero": [],
+      "count_dropped": [],
+      "equal_frames": 1,
+      "uniform_region": false,
+      "cells_changed_by_win_action": 2891
+    }
+  ]
+}
