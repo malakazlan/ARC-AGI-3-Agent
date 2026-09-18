@@ -62,6 +62,8 @@ class RulePolicy:
         self.touches = 0
         self.last_progress = 0.0
         self.energy_before: int | None = None         # bar reading when we pressed into a tool
+        self.ambient_rises = 0                       # bar rises seen while the avatar stood still
+        self._last_key: int | None = None
         self.prev_changed: frozenset = frozenset()   # cells that changed on the previous action
         self.goal_needs_anchor = False
         self.last_grid: np.ndarray | None = None
@@ -91,6 +93,14 @@ class RulePolicy:
             self.last_grid = observation.grid
             self.prev_changed = frozenset()
             return
+        energy = self.explorer.energy
+        if (energy is not None and observation.grid is not None and self.last_grid is not None
+                and self.last_grid.shape == observation.grid.shape and self.pending_touch is None
+                and energy.remaining(observation.grid) > energy.remaining(self.last_grid)):
+            avatar = self.explorer.avatar
+            moved = avatar is not None and avatar.confident and avatar.last_vector.get(self._last_key) not in (None, (0, 0))
+            if not moved:
+                self.ambient_rises += 1   # the bar rose while we stood still: it rises by itself
         if observation.grid is not None and self.last_grid is not None and self.pending_touch is not None:
             self._read_touch(self.last_grid, observation.grid)
         self.pending_touch = None
@@ -114,8 +124,10 @@ class RulePolicy:
         signature, key, cells = self.pending_touch  # type: ignore[misc]
         self.tool_cells[signature] = cells
         energy = self.explorer.energy
-        if energy is not None and self.energy_before is not None and energy.remaining(after) > self.energy_before:
-            self.store.set_tool(signature, "refill")   # the bar rose: whatever else it did
+        if (energy is not None and self.energy_before is not None and self.ambient_rises == 0
+                and signature[0] == energy.full_colour and energy.remaining(after) > self.energy_before):
+            # an object in the bar's colour that made the bar rise (and the bar never rises by itself)
+            self.store.set_tool(signature, "refill")
             self.diagnostics["refills"] = self.diagnostics.get("refills", 0) + 1
             return
         mask = self.explorer.mask if (self.explorer.mask is not None and self.explorer.mask.shape == before.shape) else None
@@ -139,7 +151,7 @@ class RulePolicy:
         elif known is None or known.kind not in ("dial", "refill"):
             self.store.set_tool(signature, "unknown", events=[e.kind for e in side])
         if self.store.goal is None:
-            pairs = display_pairs(after, changed)
+            pairs = display_pairs(after, changed, exclude=mask)
             if pairs:
                 pair = pairs[0]
                 self.store.displays.append({"changeable": pair.changeable_box, "static": pair.static_box})
@@ -181,9 +193,12 @@ class RulePolicy:
             choice = None
         if choice is None:
             self.diagnostics["delegated"] += 1
-            return self.explorer(observation)
+            choice = self.explorer(observation)
+            self._last_key = choice.action_id
+            return choice
         self.diagnostics["rule_actions"] += 1
         self.explorer.adopt(choice.key)
+        self._last_key = choice.action_id
         return choice
 
     def _decide(self, observation: Observation) -> ActionChoice | None:
@@ -266,6 +281,9 @@ class RulePolicy:
         vals, counts = np.unique(grid, return_counts=True)
         bg = int(vals[int(np.argmax(counts))])
         frames = _frames(grid, bg)
+        mask = self.explorer.mask
+        if mask is not None and mask.shape == grid.shape:
+            frames = [f for f in frames if not mask[f.bbox[0]:f.bbox[2] + 1, f.bbox[1]:f.bbox[3] + 1].any()]
 
         def same(box, colour):
             y0, x0, y1, x1 = box
@@ -331,8 +349,8 @@ class RulePolicy:
             return None
         energy = self.explorer.energy
         grid = observation.grid
-        if energy is None or purpose == "refill" or not self.explorer.mask_ok(grid):
-            return choice
+        if energy is None or purpose == "refill" or not self.explorer.mask_ok(grid) or self.ambient_rises:
+            return choice   # no bar, or a meter that refills itself: nothing to budget
         need = len(self.plan) + 2 if choice.reason.startswith("rules: walk") else 1
         need += self._refill_reserve(grid, target)
         if energy.affordable(need, grid):

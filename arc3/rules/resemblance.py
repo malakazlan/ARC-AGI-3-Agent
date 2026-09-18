@@ -77,11 +77,15 @@ def _contains(box: BBox, cells: frozenset) -> bool:
     return any(y0 <= y <= y1 and x0 <= x <= x1 for (y, x) in cells)
 
 
-def display_pairs(grid: np.ndarray, changed_cells: frozenset) -> list[DisplayPair]:
-    """Pairs (changeable frame containing the change, static frame that resembles it), best first."""
+def display_pairs(grid: np.ndarray, changed_cells: frozenset,
+                  exclude: np.ndarray | None = None) -> list[DisplayPair]:
+    """Pairs (changeable frame containing the change, static frame that resembles it), best first.
+    Frames whose box holds an excluded cell (the energy bar) are not displays."""
     vals, counts = np.unique(grid, return_counts=True)
     bg = int(vals[int(np.argmax(counts))])
     frames = _frames(grid, bg)
+    if exclude is not None and exclude.shape == grid.shape:
+        frames = [f for f in frames if not exclude[f.bbox[0]:f.bbox[2] + 1, f.bbox[1]:f.bbox[3] + 1].any()]
     changeable = [f for f in frames if _contains(f.bbox, changed_cells)]
     pairs: list[DisplayPair] = []
     for c in changeable:

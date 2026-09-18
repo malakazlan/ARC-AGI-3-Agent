@@ -176,9 +176,9 @@ def test_countdown_mask_tolerates_attempts_of_different_length():
     from arc3.perception import countdown_mask
 
     a1 = attempt_with_bar([(1, 1), (1, 2), (1, 3), (2, 3), (3, 3), (3, 4), (3, 5)])
-    a2 = attempt_with_bar([(1, 1), (2, 1), (3, 1)])
+    a2 = attempt_with_bar([(1, 1), (2, 1), (3, 1), (4, 1)])
     mask = countdown_mask([a1, a2])
-    assert mask[7, :2].all()
+    assert mask[7, :3].all()
     assert not mask[:7].any()
 
 
@@ -348,3 +348,53 @@ def test_countdown_mask_requires_a_drain_front_that_sweeps_along_the_bar():
     a1 = attempt(None); a2 = attempt(None)
     actions = [[1, 3, 1, 4, 2, 3, 4, 1, 2, 3, 4], [2, 2, 2, 1, 4, 4, 2, 3, 1, 1, 3]]
     assert not countdown_mask([a1, a2], actions).any()
+
+
+def _single_attempt(frames, actions):
+    from arc3.perception import AttemptSignature
+
+    sig = AttemptSignature()
+    for k, f in enumerate(frames):
+        sig.push(f, None if k == 0 else actions[k - 1])
+    return sig
+
+
+def test_single_attempt_bar_is_found_from_one_attempt_with_varied_actions():
+    """A human sees the bar in the first attempt: a line that loses a cell per action whatever
+    key is pressed. No second attempt is needed."""
+    from arc3.perception import countdown_mask_single_attempt
+
+    path = [(1, 1), (1, 2), (1, 3), (2, 3), (3, 3), (3, 4), (4, 4)]
+    frames = attempt_with_bar(path)          # bar row 7 drains one cell per step
+    actions = [4, 4, 2, 2, 4, 2]
+    mask = countdown_mask_single_attempt(_single_attempt(frames, actions), frames[0].shape)
+    assert mask[7, 0:5].all()
+    assert not mask[:7].any()
+
+
+def test_single_attempt_bar_needs_more_than_one_key():
+    """A line that changes while the same key is pressed over and over could be the key's own
+    effect (a filling meter, a trail): no evidence of independence."""
+    from arc3.perception import countdown_mask_single_attempt
+
+    path = [(1, 1), (1, 2), (1, 3), (1, 4), (1, 5), (1, 6), (1, 7)]
+    frames = attempt_with_bar(path)
+    actions = [4, 4, 4, 4, 4, 4]
+    assert not countdown_mask_single_attempt(_single_attempt(frames, actions), frames[0].shape).any()
+
+
+def test_single_attempt_bar_ignores_a_block_that_appears_at_once_and_a_wandering_trail():
+    """A 3x3 object that appears in one step (one offset) and a one-cell avatar's trail (cells
+    change twice, or lie scattered) are not bars."""
+    from arc3.perception import countdown_mask_single_attempt
+
+    frames = []
+    path = [(1, 1), (1, 2), (2, 2), (2, 3), (3, 3), (3, 4), (4, 4)]
+    for t, (py, px) in enumerate(path):
+        g = grid8()
+        if t >= 3:
+            g[5:8, 5:8] = 6                  # a block that appears at step 3
+        g[py, px] = 1
+        frames.append(g)
+    actions = [4, 2, 4, 2, 4, 2]
+    assert not countdown_mask_single_attempt(_single_attempt(frames, actions), frames[0].shape).any()

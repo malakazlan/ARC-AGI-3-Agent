@@ -6,6 +6,7 @@ from arc3.perception.grid import (
     GridObject,
     countdown_mask,
     countdown_mask_from_signatures,
+    countdown_mask_single_attempt,
     frame_diff,
     segment_objects,
     shape_key,

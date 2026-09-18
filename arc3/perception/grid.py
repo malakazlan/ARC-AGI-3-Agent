@@ -6,7 +6,8 @@ from dataclasses import dataclass
 
 import numpy as np
 
-BBox = tuple[int, int, int, int]  # y0, x0, y1, x1 inclusive
+BBox = tuple[int, int, int, int]
+MIN_BAR_CELLS = 3  # a bar is a line, not a pair of cells  # y0, x0, y1, x1 inclusive
 
 
 @dataclass(frozen=True, eq=False)
@@ -88,6 +89,7 @@ class AttemptSignature:
         self.shape: tuple[int, int] | None = None
         self.actions: list[object] = []  # actions[o] produced frame o; actions[0] is None
         self._prev: np.ndarray | None = None
+        self._first: np.ndarray | None = None
         self._cells: dict[tuple[int, int], list[tuple[int, int]] | None] = {}
 
     def push(self, frame: np.ndarray, action: object = None) -> None:
@@ -105,6 +107,8 @@ class AttemptSignature:
                 self._cells[cell] = seq
         self.shape = (int(frame.shape[0]), int(frame.shape[1]))
         self.actions.append(None if self._prev is None else action)
+        if self._prev is None:
+            self._first = frame.copy()
         self._prev = frame
         self.length += 1
 
@@ -126,11 +130,11 @@ def countdown_mask_from_signatures(signatures: list[AttemptSignature], shape: tu
 
     A bar cell's first change (offset and value) is the same in every attempt, up to a small
     tolerance, as far as the shorter attempt lets us compare, and it changed in at least two
-    attempts. The change must be independent of what the agent did: the actions that led up
-    to it differ between supporting attempts (an identical replay would make the player's own
+    attempts. The change must be independent of what the agent did: the action right before
+    it differs between supporting attempts (an identical replay would make the player's own
     trail look like a bar; unknown actions, None, count as differing). Isolated cells are
     ignored: bar cells come in connected groups whose first offsets are staggered and sweep
-    monotonically along the bar.
+    monotonically along the bar. Within one attempt, see `countdown_mask_single_attempt`.
     """
     shape = (int(shape[0]), int(shape[1]))
     mask = np.zeros(shape, dtype=bool)
@@ -168,17 +172,14 @@ def countdown_mask_from_signatures(signatures: list[AttemptSignature], shape: tu
             if not ok or len(support) < min_attempts:
                 continue
             # independence is judged at the change we compared (each attempt's first change):
-            # the action histories that led there must differ, an identical replay proves nothing
-            histories = set()
-            unknown = False
+            # the action right before it must differ between attempts; the same key producing
+            # the same change every time is what causation looks like
+            acts = set()
             for j in support:
                 sig = signatures[j]
                 first = seqs[j][cell][0][0]
-                prefix = tuple(sig.actions[1:first + 1])
-                if len(prefix) < first or None in prefix:
-                    unknown = True
-                histories.add(prefix)
-            if not require_independence or unknown or len(histories) >= 2:
+                acts.add(sig.actions[first] if first < len(sig.actions) else None)
+            if not require_independence or None in acts or len(acts) >= 2:
                 consistent[cell] = seq
     if not consistent:
         return mask
@@ -189,7 +190,7 @@ def countdown_mask_from_signatures(signatures: list[AttemptSignature], shape: tu
         cells = [c for c in consistent if group.bbox[0] <= c[0] <= group.bbox[2]
                  and group.bbox[1] <= c[1] <= group.bbox[3]]
         firsts = {c: consistent[c][0][0] for c in cells}
-        if group.size >= 2 and len(set(firsts.values())) >= 2 and _drain_front_in_order(firsts):
+        if group.size >= MIN_BAR_CELLS and len(set(firsts.values())) >= 2 and _drain_front_in_order(firsts):
             for y, x in cells:
                 mask[y, x] = True
     return mask
@@ -213,6 +214,55 @@ def _drain_front_in_order(firsts: dict[tuple[int, int], int]) -> bool:
         if not (inc or dec):
             return False
     return True
+
+
+def countdown_mask_single_attempt(signature: AttemptSignature, shape: tuple[int, int],
+                                  min_cells: int = MIN_BAR_CELLS) -> np.ndarray:
+    """A bar read from one attempt, the way a player sees it: a connected group of cells that
+    each changed once, all from the same value to the same value, whose change offsets sweep
+    monotonically along the group's long axis with at least two distinct offsets, while the
+    actions taken over that stretch used at least two different keys (a line that only changes
+    while one key is held could be that key's own effect). Bars are never the frame's background.
+    """
+    shape = (int(shape[0]), int(shape[1]))
+    mask = np.zeros(shape, dtype=bool)
+    if signature.shape != shape or signature.length < 3 or signature._prev is None:
+        return mask
+    first = signature._first
+    if first is None:
+        return mask
+    vals, counts = np.unique(first, return_counts=True)
+    background = int(vals[int(np.argmax(counts))])
+    once = signature.once
+    if len(once) < min_cells:
+        return mask
+    candidates = np.zeros(shape, dtype=np.int8)
+    for (y, x) in once:
+        if int(first[y, x]) != background:
+            candidates[y, x] = 1
+    for group in segment_objects(candidates, background=0):
+        if group.size < min_cells:
+            continue
+        cells = list(group.cells)
+        froms = {int(first[y, x]) for (y, x) in cells}
+        tos = {once[c][1] for c in cells}
+        if len(froms) != 1 or len(tos) != 1:
+            continue
+        firsts = {c: once[c][0] for c in cells}
+        if len(set(firsts.values())) < 2 or not _drain_front_in_order(firsts):
+            continue
+        offsets = sorted(set(firsts.values()))
+        keys = set()
+        for o in range(offsets[0], offsets[-1] + 1):
+            if o < len(signature.actions):
+                keys.add(signature.actions[o])
+        if None in keys:
+            keys.discard(None)
+        if len(keys) < 2:
+            continue
+        for (y, x) in cells:
+            mask[y, x] = True
+    return mask
 
 
 DRAIN_TOLERANCE = 2  # actions; a free move (conveyor) shifts a bar by one or two

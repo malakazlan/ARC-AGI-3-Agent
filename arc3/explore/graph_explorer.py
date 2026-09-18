@@ -18,7 +18,8 @@ from typing import Any
 
 import numpy as np
 
-from arc3.perception import AttemptSignature, countdown_mask_from_signatures, segment_objects, state_hash
+from arc3.perception import (AttemptSignature, countdown_mask_from_signatures, countdown_mask_single_attempt,
+                             segment_objects, state_hash)
 from arc3.world_model.energy import EnergyModel
 from arc3.plan import path_to_nearest_frontier, plan_moves
 from arc3.types import COMPLEX_ACTION_ID, ActionChoice, ActionKey, Observation
@@ -143,6 +144,8 @@ class GraphExplorer:
         elif self.pending is not None:
             self.attempt_actions += 1
         self.attempt.push(observation.grid, self.pending[1] if self.pending else None)
+        if self.use_countdown_mask and self.mask is None and self.attempt.length >= 4:
+            self._learn_mask_single()
         self.last_grid = observation.grid
 
         key = state_hash(observation.grid, self.mask)
@@ -419,13 +422,14 @@ class GraphExplorer:
         if self.level_start is None or self.level_start.shape != mask.shape:
             return mask
         detected = int(mask.sum())
-        limit = max(6 * detected, 64)
+        limit = max(20 * detected, 256)
         grown = mask.copy()
         vals, counts = np.unique(self.level_start, return_counts=True)
         background = int(vals[int(np.argmax(counts))])   # a bar is never drawn in the background
         for obj in segment_objects(self.level_start, background=background):
-            if obj.size > limit:
-                continue
+            y0, x0, y1, x1 = obj.bbox
+            if obj.size > limit or min(y1 - y0, x1 - x0) + 1 > 4:
+                continue   # too big, or not a line: a bar is thin
             if any(mask[y, x] for (y, x) in obj.cells):
                 for (y, x) in obj.cells:
                     grown[y, x] = True
@@ -454,10 +458,12 @@ class GraphExplorer:
         self._forget_position()
 
     def _bar_drained(self) -> bool:
-        """True when the learned bar cells read as empty in the last frame before death."""
+        """True when the bar in the last frame before death could not pay for one more action."""
         if not self.drain_values or self.last_grid is None:
             return False
         grid = self.last_grid
+        if self.energy is not None and self.energy.capacity and self.mask_ok(grid):
+            return self.energy.remaining(grid) <= max(1, int(np.ceil(self.energy.rate)))
         hits = sum(1 for (y, x), v in self.drain_values.items()
                    if y < grid.shape[0] and x < grid.shape[1] and grid[y, x] == v)
         return hits / len(self.drain_values) >= DRAINED_FRACTION
@@ -496,6 +502,25 @@ class GraphExplorer:
             self.diagnostics["mask_cells"] = int(mask.sum())
             self._rebuild_graph()
 
+    def _learn_mask_single(self) -> None:
+        """The bar as seen within the current attempt (no second attempt needed)."""
+        shape = self.attempt.shape
+        if shape is None:
+            return
+        mask = countdown_mask_single_attempt(self.attempt, shape)
+        for (y, x) in self.trail:
+            if 0 <= y < shape[0] and 0 <= x < shape[1]:
+                mask[y, x] = False
+        if not mask.any():
+            return
+        mask = self._whole_bar(mask)
+        self.mask = mask
+        self.drain_values = self._drain_values(mask)
+        self.energy = EnergyModel(self._full_values(mask), self.drain_values)
+        self.diagnostics["mask_cells"] = int(mask.sum())
+        self.diagnostics["mask_single"] = self.diagnostics.get("mask_single", 0) + 1
+        self._rebuild_graph()
+
     def _unmask_trail(self) -> None:
         """Mask cells the avatar turned out to walk over are not a bar: drop them."""
         if self.mask is None:
@@ -512,12 +537,18 @@ class GraphExplorer:
             self.mask = None
 
     def _drain_values(self, mask: np.ndarray) -> dict[tuple[int, int], int]:
-        """Per bar cell, the value it ends an attempt with (fully drained)."""
+        """Per bar cell, the value it ends an attempt with (fully drained). Cells not yet seen
+        draining take the value the drained cells of the same bar show."""
         values: dict[tuple[int, int], int] = {}
-        for sig in self.attempts:
+        for sig in list(self.attempts) + [self.attempt]:
             for cell, seq in sig.sequences.items():
                 if mask[cell]:
                     values[cell] = seq[-1][1]
+        if values:
+            common = Counter(values.values()).most_common(1)[0][0]
+            ys, xs = np.nonzero(mask)
+            for y, x in zip(ys, xs):
+                values.setdefault((int(y), int(x)), common)
         return values
 
     def _learn_budget(self) -> None:

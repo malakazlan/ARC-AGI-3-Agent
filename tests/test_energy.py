@@ -73,3 +73,21 @@ def test_bar_mask_is_carried_into_the_next_level_when_the_bar_is_where_it_was():
     first_level2 = next((i for i, (o, _) in enumerate(log) if o.levels_completed == 1), None)
     assert first_level2 is not None
     assert ex.diagnostics["mask_carried"] >= 1
+
+
+def test_explorer_knows_the_bar_before_the_first_death():
+    """The bar is read within the first attempt: the mask exists before any death."""
+    game = DisplayToy(energy=20, exit_in_target=True)
+    brain = Orchestrator(Arc3Config(seed=0, policy="graph"), game_id="display", started_at=0.0)
+    obs = game.observe()
+    seen_before_death = False
+    for _ in range(60):
+        if brain.is_done(obs, now=1.0):
+            break
+        choice = brain.choose(obs, now=1.0)
+        if game.silent_deaths == 0 and brain.policy.mask is not None and brain.policy.mask.any():
+            seen_before_death = True
+            break
+        obs = game.apply(choice.action_id, choice.x, choice.y)
+    assert seen_before_death
+    assert brain.policy.energy is not None and brain.policy.energy.capacity >= 10
