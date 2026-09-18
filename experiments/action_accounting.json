@@ -1,0 +1,112 @@
+[
+  {
+    "game": "lp85",
+    "level": 1,
+    "human": 17,
+    "learn": 16,
+    "retest": 4,
+    "navigate": 0,
+    "waste": 1,
+    "total": 21
+  },
+  {
+    "game": "m0r0",
+    "level": 1,
+    "human": 30,
+    "learn": 13,
+    "retest": 353,
+    "navigate": 3,
+    "waste": 120,
+    "total": 489
+  },
+  {
+    "game": "r11l",
+    "level": 1,
+    "human": 22,
+    "learn": 3,
+    "retest": 8,
+    "navigate": 0,
+    "waste": 0,
+    "total": 11
+  },
+  {
+    "game": "s5i5",
+    "level": 1,
+    "human": 20,
+    "learn": 33,
+    "retest": 582,
+    "navigate": 32,
+    "waste": 11,
+    "total": 658
+  },
+  {
+    "game": "sp80",
+    "level": 1,
+    "human": 39,
+    "learn": 49,
+    "retest": 593,
+    "navigate": 236,
+    "waste": 75,
+    "total": 953
+  },
+  {
+    "game": "su15",
+    "level": 1,
+    "human": 22,
+    "learn": 22,
+    "retest": 581,
+    "navigate": 43,
+    "waste": 20,
+    "total": 666
+  },
+  {
+    "game": "tu93",
+    "level": 1,
+    "human": 19,
+    "learn": 12,
+    "retest": 316,
+    "navigate": 154,
+    "waste": 9,
+    "total": 491
+  },
+  {
+    "game": "tu93",
+    "level": 2,
+    "human": 16,
+    "learn": 0,
+    "retest": 126,
+    "navigate": 2,
+    "waste": 2,
+    "total": 130
+  },
+  {
+    "game": "vc33",
+    "level": 1,
+    "human": 7,
+    "learn": 19,
+    "retest": 197,
+    "navigate": 4,
+    "waste": 2,
+    "total": 222
+  },
+  {
+    "game": "vc33",
+    "level": 2,
+    "human": 18,
+    "learn": 16,
+    "retest": 247,
+    "navigate": 18,
+    "waste": 5,
+    "total": 286
+  },
+  {
+    "game": "g50t",
+    "level": 1,
+    "human": 78,
+    "learn": 15,
+    "retest": 573,
+    "navigate": 10,
+    "waste": 105,
+    "total": 703
+  }
+]

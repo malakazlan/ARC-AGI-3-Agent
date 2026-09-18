@@ -63,3 +63,13 @@ Dev machine: i5-7300HQ, 4 cores, 7.7 GB RAM in WSL. Benchmarks with many seeds w
 - Confirmed on sb26 and su15 (wasted clicks gone), failed on ft09/lp85 (dead frontier) and
   sp80 (state-conditional deaths). See `docs/INSIGHTS.md`.
 - Kaggle readiness unchanged: notebook builds; Phase 4's offline notebook dry run not done yet.
+
+## 2026-09-18 — Phase 4 dry run and action accounting
+
+- `scripts/dry_run_notebook.py`: executes the built notebook's cells into a scratch tree, starts
+  the toolkit gateway in competition mode, runs the notebook's own `main.py --agent myagent`
+  against it with the repo off sys.path. **PASS**: 25 games, exit 0, 0 tracebacks, 0 fallbacks,
+  one ARC3DIAG line per game, 78 s at 150 actions per game. Ready for the first submission.
+- `eval/action_accounting.py` on the 11 won levels (seed 0): learn 4%, retest 77%, navigate
+  11%, waste 8% of 4630 actions. Learning alone is 198 actions, about 18 per level, i.e. human
+  scale. Re-testing known mechanics in every new state is what costs the score.
