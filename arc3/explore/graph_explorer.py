@@ -19,6 +19,7 @@ from typing import Any
 import numpy as np
 
 from arc3.perception import AttemptSignature, countdown_mask_from_signatures, segment_objects, state_hash
+from arc3.world_model.energy import EnergyModel
 from arc3.plan import path_to_nearest_frontier, plan_moves
 from arc3.types import COMPLEX_ACTION_ID, ActionChoice, ActionKey, Observation
 from arc3.world_model import (
@@ -84,6 +85,10 @@ class GraphExplorer:
         # per-level attempt memory
         self.mask: np.ndarray | None = None
         self.trail: set[tuple[int, int]] = set()  # every cell the avatar has occupied this level
+        self.level_start: np.ndarray | None = None  # first frame of the current level
+        self.carried: tuple[np.ndarray, dict, dict] | None = None  # (mask, drain values, full values)
+        self.energy: EnergyModel | None = None
+        self.restarted = False  # the last observation was a silent level restart
         self.drain_values: dict[tuple[int, int], int] = {}  # bar cell -> value it drains to
         self.last_grid: np.ndarray | None = None
         self.budget: int | None = None
@@ -98,6 +103,7 @@ class GraphExplorer:
             "budget": None, "graph_rebuilds": 0, "deferred_picks": 0,
             "retests_avoided": 0, "mismatches": 0, "planner_resets": 0, "planned_moves": 0,
             "avatar_known_at": None, "kill_colours": 0, "effects_avoided": 0, "dial_capped": 0,
+            "silent_deaths": 0, "mask_carried": 0,
         }
 
     # -- learning from what happened -------------------------------------------------------
@@ -120,8 +126,17 @@ class GraphExplorer:
             self.expected = None
             return
 
+        self.restarted = False
+        if self.level_start is None:
+            self.level_start = observation.grid.copy()
+            self._carry_mask(observation.grid)
+        elif self._silent_restart(observation):
+            self._on_restart()
+
         self._learn_move(observation.grid)
         self._learn_effect(observation.grid)
+        if self.energy is not None and self.mask_ok(observation.grid):
+            self.energy.observe(observation.grid)
         self.current_grid = observation.grid
         if self.attempt.length == 0:
             self.attempt_actions = 0
@@ -338,6 +353,90 @@ class GraphExplorer:
         cells = self.avatar.avatar_cells(self.current_grid)  # type: ignore[union-attr]
         return predict_move(self.current_grid, cells, vec, self.passability)  # type: ignore[arg-type]
 
+    RESTART_TOLERANCE = 16  # cells that may differ from the level's start frame (a counter)
+
+    def _silent_restart(self, observation: Observation) -> bool:
+        """The level started over without GAME_OVER: the frame is the level's start frame again
+        (up to a counter), after a flash, or with the bar back to full from empty."""
+        grid = observation.grid
+        if self.level_start is None or grid.shape != self.level_start.shape or self.attempt_actions < 1:
+            return False
+        diff = grid != self.level_start
+        if int(diff.sum()) > self.RESTART_TOLERANCE:
+            return False
+        if observation.flash:
+            return True
+        # no flash: only a bar that jumped from empty to full while the avatar is back at its
+        # start cells counts (a refill taken from an empty bar elsewhere is not a restart)
+        if self.avatar is not None and self.avatar.confident and self.avatar.last_cells:
+            if any(diff[y, x] for (y, x) in self.avatar.last_cells if y < diff.shape[0] and x < diff.shape[1]):
+                return False
+        if self.energy is not None and self.last_grid is not None and self.last_grid.shape == grid.shape:
+            before, after = self.energy.remaining(self.last_grid), self.energy.remaining(grid)
+            return before <= self.energy.rate and after >= self.energy.capacity - 1
+        return False
+
+    def _on_restart(self) -> None:
+        """Bookkeeping of a death that left no GAME_OVER: the attempt ends, nothing is blamed."""
+        self.diagnostics["silent_deaths"] += 1
+        died_at = self.attempt_actions + 1
+        if self.budget_aware and self._bar_drained():
+            self.diagnostics["budget_deaths"] += 1
+        self.death_lengths[died_at] += 1
+        self._close_attempt()
+        self._learn_budget()
+        self._forget_position()
+        self.last_grid = None
+        self.expected = None
+        self.restarted = True
+        if self.energy is not None:
+            self.energy.forget_last()
+
+    def _carry_mask(self, grid: np.ndarray) -> None:
+        """A new level whose bar cells look full where the old bar was keeps the old mask."""
+        if self.carried is None:
+            return
+        mask, drain_values, full = self.carried
+        self.carried = None
+        if mask.shape != grid.shape or not full:
+            return
+        h, w = grid.shape
+        agree = sum(1 for (y, x), v in full.items() if y < h and x < w and int(grid[y, x]) == v)
+        if agree < 0.9 * len(full):
+            return
+        self.mask = mask
+        self.drain_values = drain_values
+        self.energy = EnergyModel(full, drain_values)
+        self.diagnostics["mask_carried"] += 1
+        self.diagnostics["mask_cells"] = int(mask.sum())
+
+    def _whole_bar(self, mask: np.ndarray) -> np.ndarray:
+        """Grow the detected cells to the whole object they belong to in the level's start
+        frame: a refill mid-attempt shifts the drain schedule of the cells behind it, so the
+        detector only ever sees the front of the bar agree across attempts, while the bar is
+        plainly the one line those cells are part of. Bounded so a bar drawn in a floor colour
+        cannot swallow the floor."""
+        if self.level_start is None or self.level_start.shape != mask.shape:
+            return mask
+        detected = int(mask.sum())
+        limit = max(6 * detected, 64)
+        grown = mask.copy()
+        vals, counts = np.unique(self.level_start, return_counts=True)
+        background = int(vals[int(np.argmax(counts))])   # a bar is never drawn in the background
+        for obj in segment_objects(self.level_start, background=background):
+            if obj.size > limit:
+                continue
+            if any(mask[y, x] for (y, x) in obj.cells):
+                for (y, x) in obj.cells:
+                    grown[y, x] = True
+        return grown
+
+    def _full_values(self, mask: np.ndarray) -> dict[tuple[int, int], int]:
+        if self.level_start is None or self.level_start.shape != mask.shape:
+            return {}
+        ys, xs = np.nonzero(mask)
+        return {(int(y), int(x)): int(self.level_start[y, x]) for y, x in zip(ys, xs)}
+
     def _on_game_over(self) -> None:
         self.diagnostics["game_overs"] += 1
         died_at = self.attempt_actions + 1  # the pending action counts
@@ -384,11 +483,16 @@ class GraphExplorer:
         for (y, x) in self.trail:
             if 0 <= y < shape[0] and 0 <= x < shape[1]:
                 mask[y, x] = False  # the player's own trail is never an energy bar
+        if self.mask is not None and self.mask.shape == mask.shape:
+            mask |= self.mask   # evidence accumulates: identical replays later in the level
+                                # (a policy repeating a good path) must not erase the bar
         if not mask.any():
             return
+        mask = self._whole_bar(mask)
         if self.mask is None or mask.shape != self.mask.shape or not np.array_equal(mask, self.mask):
             self.mask = mask
             self.drain_values = self._drain_values(mask)
+            self.energy = EnergyModel(self._full_values(mask), self.drain_values)
             self.diagnostics["mask_cells"] = int(mask.sum())
             self._rebuild_graph()
 
@@ -617,7 +721,11 @@ class GraphExplorer:
         self.level_index = levels
         self.graph = StateGraph(self.max_nodes)
         self.trace = []
+        if self.mask is not None and self.energy is not None:
+            self.carried = (self.mask, dict(self.drain_values), dict(self.energy.full))
         self.mask = None
+        self.energy = None
+        self.level_start = None
         self.trail = set()
         self.drain_values = {}
         self.last_grid = None

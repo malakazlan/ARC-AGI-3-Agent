@@ -19,6 +19,7 @@ class Observation:
     win_levels: int
     grid: np.ndarray | None  # last frame, int8 [y, x]; None before the first frame
     available_actions: list[int]
+    flash: bool = False  # an intermediate frame of this response was (almost) one solid colour
 
 
 @dataclass(frozen=True)

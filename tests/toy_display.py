@@ -13,6 +13,10 @@ Variants (each mirrors something seen on the real ls20):
                    centre, so the avatar is drawn inside the target for two presses
   compound_rotator the rotator is a two-colour icon (7 and 8, three cells); any cell rotates
   bar              an energy bar inside a colour-6 frame drains one cell per action (no death)
+  energy=N         N actions of energy per attempt, shown as a 10-cell bar (colour 11, row 8,
+                   cols 1-10) that loses a cell every N/10 actions; an action on an empty bar
+                   restarts the level in place with a flash (no GAME_OVER), like ls20. Refill
+                   cells of the bar's colour at (6, 9) and (1, 5) restore it.
   levels           2: level 2 keeps the rule, moves the target and the rotator
 """
 from __future__ import annotations
@@ -24,12 +28,16 @@ from arc3.agent import Observation
 MOVES = {1: (-1, 0), 2: (1, 0), 3: (0, -1), 4: (0, 1)}
 CYCLE = (9, 3, 5)
 ROTATOR_COLOURS = (7, 8)
+BAR_COLOUR = 11
+REFILL_CELLS = ((6, 9), (1, 5))
+BAR_CELLS = 10
 
 
 class DisplayToy:
     def __init__(self, target: int = 5, start_inner: int = 9, exit_in_target: bool = False,
                  rotator_walkable: bool = False, deep_target: bool = False,
-                 compound_rotator: bool = False, bar: bool = False, levels: int = 1) -> None:
+                 compound_rotator: bool = False, bar: bool = False, levels: int = 1,
+                 energy: int | None = None) -> None:
         self.target = target
         self.start_inner = start_inner
         self.exit_in_target = exit_in_target or deep_target
@@ -37,6 +45,8 @@ class DisplayToy:
         self.deep_target = deep_target
         self.compound_rotator = compound_rotator
         self.bar = bar
+        self.energy = energy
+        self.energy_left = energy
         self.under_avatar = 0
         self.levels = levels
         self.levels_completed = 0
@@ -44,8 +54,11 @@ class DisplayToy:
         self.steps = 0
         self.level_steps = 0
         self.game_overs = 0
+        self.silent_deaths = 0
+        self.refills = 0
         self.touches = 0
         self.bar_left = 5
+        self.flash = False
         self.grid = self._layout()
 
     # -- geometry per level ----------------------------------------------------------------
@@ -84,12 +97,24 @@ class DisplayToy:
             g[8:12, 5:12] = 6                   # a frame of the panel's colour around the bar
             g[9:11, 6:11] = 0
             g[10, 6:6 + self.bar_left] = 3
+        if self.energy is not None:
+            self.energy_left = self.energy
+            for cell in REFILL_CELLS:
+                g[cell] = BAR_COLOUR
+            self._draw_energy(g)
         g[7, 6] = 1                             # avatar
         return g
 
+    def _draw_energy(self, g: np.ndarray) -> None:
+        per_cell = self.energy / BAR_CELLS
+        full = int(np.ceil(self.energy_left / per_cell))
+        g[8, 1:1 + BAR_CELLS] = 0
+        g[8, 1:1 + full] = BAR_COLOUR
+
     def observe(self) -> Observation:
         grid = self.grid.copy() if self.state == "NOT_FINISHED" else None
-        return Observation(self.state, self.levels_completed, self.levels, grid, [1, 2, 3, 4])
+        flash, self.flash = self.flash, False
+        return Observation(self.state, self.levels_completed, self.levels, grid, [1, 2, 3, 4], flash=flash)
 
     @property
     def inner(self) -> int:
@@ -101,6 +126,14 @@ class DisplayToy:
         self.bar_left = 5 if self.bar_left <= 1 else self.bar_left - 1
         self.grid[10, 6:11] = 0
         self.grid[10, 6:6 + self.bar_left] = 3
+
+    def _restart_level(self) -> Observation:
+        """ls20-style silent death: the level starts over, state stays NOT_FINISHED."""
+        self.silent_deaths += 1
+        self.under_avatar = 0
+        self.grid = self._layout()
+        self.flash = True
+        return self.observe()
 
     def _win(self) -> Observation:
         self.levels_completed += 1
@@ -122,15 +155,27 @@ class DisplayToy:
             return self.observe()
         if self.state != "NOT_FINISHED" or action_id not in MOVES:
             return self.observe()
+        if self.energy is not None:
+            if self.energy_left <= 0:
+                return self._restart_level()
+            self.energy_left -= 1
+            self._draw_energy(self.grid)
         dy, dx = MOVES[action_id]
         py, px = map(int, np.argwhere(self.grid == 1)[0])
         ny, nx = py + dy, px + dx
         if not (0 <= ny < 12 and 0 <= nx < 12):
             return self.observe()
         self._tick_bar()
+        if self.energy is not None and ny == 8 and 1 <= nx < 1 + BAR_CELLS:
+            return self.observe()                # the bar row is not walkable
         cell = int(self.grid[ny, nx])
         ty0, tx0, ty1, tx1 = self._target_box()
         in_target = ty0 <= ny <= ty1 and tx0 <= nx <= tx1
+        if self.energy is not None and (ny, nx) in REFILL_CELLS:
+            self.refills += 1
+            self.energy_left = self.energy
+            self._draw_energy(self.grid)
+            return self.observe()
         if cell in ROTATOR_COLOURS:              # rotator: touch (and step onto it if walkable)
             self.touches += 1
             self.grid[10, 1] = CYCLE[(CYCLE.index(self.inner) + 1) % 3]
@@ -146,7 +191,7 @@ class DisplayToy:
                     return self._win()
                 return self.observe()
             # walking through the target's frame is allowed; it is redrawn when we leave
-        elif cell != 0:                          # walls, panels: blocked
+        elif cell != 0:                          # walls, panels, bar: blocked
             return self.observe()
         self.grid[py, px] = self.under_avatar
         self.under_avatar = cell if (cell in ROTATOR_COLOURS or (self.deep_target and in_target)) else 0

@@ -44,7 +44,18 @@ def observation_from_frame(frame: Any) -> Observation:
         win_levels=int(frame.win_levels),
         grid=grid,
         available_actions=[int(a) for a in (frame.available_actions or [])],
+        flash=_has_flash(frames),
     )
+
+
+def _has_flash(frames: list) -> bool:
+    """An intermediate frame that is one solid colour: the engine's death or transition
+    animation. The last frame itself is not judged."""
+    for f in frames[:-1]:
+        a = np.asarray(f)
+        if a.size and (a == a.flat[0]).all():
+            return True
+    return False
 
 
 class Orchestrator:

@@ -121,15 +121,16 @@ class AttemptSignature:
 
 
 def countdown_mask_from_signatures(signatures: list[AttemptSignature], shape: tuple[int, int],
-                                   min_attempts: int = 2) -> np.ndarray:
+                                   min_attempts: int = 2, require_independence: bool = True) -> np.ndarray:
     """Cells that behave like an energy or countdown bar across attempts of the same level.
 
-    A bar cell's whole change sequence (offsets and values) is the same in every attempt, as
-    far as the shorter attempt lets us compare, and it changed in at least two attempts. The
-    changes must be independent of what the agent did: at some offset of the sequence the
-    supporting attempts pressed different keys (an identical replay would make the player's own
+    A bar cell's first change (offset and value) is the same in every attempt, up to a small
+    tolerance, as far as the shorter attempt lets us compare, and it changed in at least two
+    attempts. The change must be independent of what the agent did: the actions that led up
+    to it differ between supporting attempts (an identical replay would make the player's own
     trail look like a bar; unknown actions, None, count as differing). Isolated cells are
-    ignored: bar cells come in connected groups whose first offsets are staggered.
+    ignored: bar cells come in connected groups whose first offsets are staggered and sweep
+    monotonically along the bar.
     """
     shape = (int(shape[0]), int(shape[1]))
     mask = np.zeros(shape, dtype=bool)
@@ -166,13 +167,18 @@ def countdown_mask_from_signatures(signatures: list[AttemptSignature], shape: tu
                     support.append(j)
             if not ok or len(support) < min_attempts:
                 continue
-            # independence is judged at the change we compared: each attempt's first change
-            acts = set()
+            # independence is judged at the change we compared (each attempt's first change):
+            # the action histories that led there must differ, an identical replay proves nothing
+            histories = set()
+            unknown = False
             for j in support:
                 sig = signatures[j]
                 first = seqs[j][cell][0][0]
-                acts.add(sig.actions[first] if first < len(sig.actions) else None)
-            if None in acts or len(acts) >= 2:
+                prefix = tuple(sig.actions[1:first + 1])
+                if len(prefix) < first or None in prefix:
+                    unknown = True
+                histories.add(prefix)
+            if not require_independence or unknown or len(histories) >= 2:
                 consistent[cell] = seq
     if not consistent:
         return mask
