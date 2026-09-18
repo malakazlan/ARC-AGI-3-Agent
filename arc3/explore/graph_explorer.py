@@ -25,7 +25,7 @@ from arc3.plan import path_to_nearest_frontier, plan_moves
 from arc3.types import COMPLEX_ACTION_ID, ActionChoice, ActionKey, Observation
 from arc3.world_model import (
     ActionPrior, AvatarModel, ClickEffects, DialModel, KeyEffects, PassabilityModel, StateGraph,
-    cells_ahead, click_class, object_signature, predict_move,
+    cells_ahead, click_class, first_obstacle_colours, object_signature, predict_move, swept_cells,
 )
 
 MOVE_KEYS = (1, 2, 3, 4)
@@ -90,6 +90,7 @@ class GraphExplorer:
         self.carried: tuple[np.ndarray, dict, dict] | None = None  # (mask, drain values, full values)
         self.energy: EnergyModel | None = None
         self.restarted = False  # the last observation was a silent level restart
+        self.lethal_moves: set[tuple[frozenset, int]] = set()  # (avatar cells, key) presses that ended the game
         self.drain_values: dict[tuple[int, int], int] = {}  # bar cell -> value it drains to
         self.last_grid: np.ndarray | None = None
         self.budget: int | None = None
@@ -196,7 +197,7 @@ class GraphExplorer:
                 actual = self.avatar.last_vector.get(key)
                 new_cells = self.avatar.last_cells
                 if actual == vec or _partial_stroke(actual, vec):
-                    for (y, x) in new_cells - old_cells:
+                    for (y, x) in self._in_bounds(swept_cells(old_cells, actual), before.shape):
                         self.passability.vote(int(before[y, x]), "passes")
                     for (y, x) in old_cells - new_cells:
                         self.floor[int(grid[y, x])] += 1
@@ -209,12 +210,13 @@ class GraphExplorer:
                 else:
                     kind = "other"  # moved in an unexpected direction: no votes
             elif outcome == "blocked":
-                for (y, x) in self._in_bounds(cells_ahead(old_cells, vec), before.shape):
-                    self.passability.vote(int(before[y, x]), "blocks")
+                # the press stopped at the first obstacle along the sweep: blame that footprint
+                for colour in first_obstacle_colours(before, old_cells, vec, self.passability):
+                    self.passability.vote(colour, "blocks")
             if self.expected is not None and kind in ("moved", "blocked", "partial"):
                 self.predictions_checked += 1
                 if kind != "partial" and kind != self.expected[0]:
-                    colours = {int(before[y, x]) for (y, x) in self._in_bounds(cells_ahead(old_cells, vec), before.shape)}
+                    colours = {int(before[y, x]) for (y, x) in self._in_bounds(swept_cells(old_cells, vec), before.shape)}
                     self._on_mismatch_event(colours)
         self.expected = None
 
@@ -254,8 +256,10 @@ class GraphExplorer:
         cells = self.avatar.last_cells
         if key not in MOVE_KEYS or vec is None or not cells or self._bar_drained():
             return
-        for (y, x) in self._in_bounds(cells_ahead(cells, vec), self.last_grid.shape):
-            self.passability.vote(int(self.last_grid[y, x]), "kills")
+        # one death, one vote per colour on the path (a 3x3 avatar sweeping 6 cells touches
+        # 18 cells; counting each would drown the pass votes of an innocent colour)
+        for colour in {int(self.last_grid[y, x]) for (y, x) in self._in_bounds(swept_cells(cells, vec), self.last_grid.shape)}:
+            self.passability.vote(colour, "kills")
             self.diagnostics["kill_colours"] += 1
         self.expected = None
 
@@ -452,6 +456,9 @@ class GraphExplorer:
             else:
                 self.graph.record(src, action, None, changed=False, game_over=True, level_up=False)
                 self._record_effect(src, action, changed=False, game_over=True)
+                if (action[0] in MOVE_KEYS and self.avatar is not None and self.avatar.confident
+                        and self.avatar.last_cells):
+                    self.lethal_moves.add((frozenset(self.avatar.last_cells), int(action[0])))
         self.death_lengths[died_at] += 1
         self._close_attempt()
         self._learn_budget()
@@ -636,7 +643,8 @@ class GraphExplorer:
             return None
         if not self.move_plan:
             cells = self.avatar.avatar_cells(self.current_grid)  # type: ignore[union-attr]
-            path = plan_moves(self.current_grid, cells, self._known_vectors(), self.passability, goal=None)  # type: ignore[arg-type]
+            path = plan_moves(self.current_grid, cells, self._known_vectors(), self.passability, goal=None,
+                              forbidden=self.lethal_moves)  # type: ignore[arg-type]
             if not path:
                 return None
             self.move_plan = list(path)
@@ -760,6 +768,7 @@ class GraphExplorer:
         self.mask = None
         self.energy = None
         self.level_start = None
+        self.lethal_moves = set()
         self.trail = set()
         self.drain_values = {}
         self.last_grid = None

@@ -16,10 +16,10 @@ from arc3.world_model.effects import (
 from arc3.world_model.graph import Edge, Node, StateGraph
 from arc3.world_model.key_effects import KeyEffects
 from arc3.world_model.dials import DialModel
-from arc3.world_model.passability import PassabilityModel, cells_ahead, predict_move
+from arc3.world_model.passability import PassabilityModel, cells_ahead, first_obstacle_colours, predict_move, swept_cells
 
 __all__ = [
     "ActionClass", "ActionPrior", "AvatarModel", "ClickEffects", "Edge", "Effect", "Node",
     "StateGraph", "action_class", "click_class", "object_signature", "relative_diff", "shape_key",
-    "PassabilityModel", "cells_ahead", "predict_move", "KeyEffects", "DialModel",
+    "PassabilityModel", "cells_ahead", "first_obstacle_colours", "predict_move", "swept_cells", "KeyEffects", "DialModel",
 ]

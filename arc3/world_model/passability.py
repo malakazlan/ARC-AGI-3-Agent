@@ -62,8 +62,42 @@ class PassabilityModel:
 
 
 def cells_ahead(cells: Cells, vector: tuple[int, int]) -> Cells:
+    """The cells the avatar lands on (its footprint shifted by the whole vector, minus itself)."""
     moved = frozenset((y + vector[0], x + vector[1]) for (y, x) in cells)
     return moved - cells
+
+
+def swept_cells(cells: Cells, vector: tuple[int, int]) -> Cells:
+    """Every cell the avatar passes through on a multi-cell step: its footprint at each unit
+    step from one up to the full vector, minus where it started. A wall anywhere on this path
+    stops the press, whatever the landing cells look like."""
+    n = max(abs(vector[0]), abs(vector[1]))
+    if n == 0:
+        return frozenset()
+    dy, dx = vector[0] // n, vector[1] // n
+    swept: set[tuple[int, int]] = set()
+    for k in range(1, n + 1):
+        swept.update((y + dy * k, x + dx * k) for (y, x) in cells)
+    return frozenset(swept) - cells
+
+
+def first_obstacle_colours(grid: np.ndarray, cells: Cells, vector: tuple[int, int],
+                           model: PassabilityModel) -> set[int]:
+    """Colours of the first footprint along the sweep that holds a cell not known to pass:
+    that is where a blocked press stopped, so that is what a block vote blames. Empty when
+    every cell on the path is known passable (a contradiction, not a lesson)."""
+    h, w = grid.shape
+    n = max(abs(vector[0]), abs(vector[1]))
+    if n == 0:
+        return set()
+    dy, dx = vector[0] // n, vector[1] // n
+    for k in range(1, n + 1):
+        step = {(y + dy * k, x + dx * k) for (y, x) in cells} - cells
+        colours = {int(grid[y, x]) for (y, x) in step if 0 <= y < h and 0 <= x < w}
+        suspects = {c for c in colours if model.passable(c) is not True}
+        if suspects:
+            return suspects
+    return set()
 
 
 def predict_move(grid: np.ndarray, cells: Cells, vector: tuple[int, int], model: PassabilityModel,
@@ -74,7 +108,7 @@ def predict_move(grid: np.ndarray, cells: Cells, vector: tuple[int, int], model:
     the colour underneath is unknown but we were standing there.
     """
     h, w = grid.shape
-    ahead = cells_ahead(cells, vector)
+    ahead = swept_cells(cells, vector)
     if any(not (0 <= y < h and 0 <= x < w) for (y, x) in ahead):
         return ("blocked", cells)
     verdicts = []

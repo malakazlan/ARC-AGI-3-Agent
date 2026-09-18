@@ -66,3 +66,53 @@ def test_predict_move_treats_cells_under_the_avatar_as_passable():
         m.vote(0, "passes")
     avatar = frozenset({(2, 2), (2, 3), (3, 2), (3, 3)})
     assert predict_move(g, avatar, (0, 1), m) == ("moved", frozenset({(2, 3), (2, 4), (3, 3), (3, 4)}))
+
+
+def test_swept_cells_cover_the_whole_stroke_of_a_multi_cell_step():
+    from arc3.world_model.passability import swept_cells
+
+    avatar = frozenset({(5, 0)})
+    assert swept_cells(avatar, (0, 3)) == frozenset({(5, 1), (5, 2), (5, 3)})
+    block = frozenset({(0, 0), (0, 1), (1, 0), (1, 1)})
+    assert swept_cells(block, (2, 0)) == frozenset({(2, 0), (2, 1), (3, 0), (3, 1)})
+
+
+def test_a_wall_between_origin_and_landing_blocks_a_multi_cell_step():
+    """tu93: six-cell steps over three-cell passages. A known wall one cell ahead blocks the
+    press even though the landing cells are known floor; an unknown colour in between makes
+    the prediction unknown, not 'moved'."""
+    import numpy as np
+
+    from arc3.world_model import PassabilityModel, predict_move
+
+    g = np.zeros((3, 8), dtype=np.int8)
+    g[1, 0] = 9                # avatar
+    g[1, 1] = 7                # wall colour
+    g[1, 2:4] = 0              # floor
+    model = PassabilityModel()
+    for _ in range(3):
+        model.vote(0, "passes"); model.vote(7, "blocks")
+    assert predict_move(g, frozenset({(1, 0)}), (0, 3), model)[0] == "blocked"
+    g[1, 1] = 4                # unknown colour in between
+    assert predict_move(g, frozenset({(1, 0)}), (0, 3), model) is None
+    g[1, 1] = 0
+    assert predict_move(g, frozenset({(1, 0)}), (0, 3), model)[0] == "moved"
+
+
+def test_a_blocked_press_blames_the_first_unknown_footprint_on_the_path():
+    """A press stops at the first obstacle. With two unknown colours on the sweep, the nearer
+    one takes the block vote; the farther one stays unknown."""
+    import numpy as np
+
+    from arc3.world_model import PassabilityModel
+    from arc3.world_model.passability import first_obstacle_colours
+
+    g = np.zeros((3, 8), dtype=np.int8)
+    g[1, 0] = 9
+    g[1, 1] = 7
+    g[1, 2] = 8
+    model = PassabilityModel()
+    assert first_obstacle_colours(g, frozenset({(1, 0)}), (0, 3), model) == {7}
+    for _ in range(3):
+        model.vote(7, "passes")
+    assert first_obstacle_colours(g, frozenset({(1, 0)}), (0, 3), model) == {8}

@@ -13,7 +13,7 @@ from collections import Counter, defaultdict
 
 import numpy as np
 
-from arc3.perception import find_translations
+from arc3.perception import find_translations, segment_objects, shape_key
 
 MIN_VOTES = 2
 MIN_SHARE = 0.6
@@ -22,6 +22,13 @@ MIN_OVERLAP = 0.5    # a partial-appearance move must overlap the tracked avatar
 
 Cells = frozenset[tuple[int, int]]
 Signature = tuple
+
+
+def coarse(sig: tuple) -> tuple:
+    """Identity for election: colour and size only. An avatar that turns, opens a gap or shows
+    a facing mark keeps its colour and size while its exact shape key changes every step
+    (tu93's ring); votes must land on one identity."""
+    return (sig[0], sig[2])
 
 
 class AvatarModel:
@@ -35,6 +42,7 @@ class AvatarModel:
         self.last_cells: Cells | None = None
         self.moves_seen = 0
         self.moves_explained = 0
+        self.instances: Counter = Counter()   # signature -> how many objects look like it (latest frame)
 
     # -- learning ---------------------------------------------------------------------------
 
@@ -51,12 +59,14 @@ class AvatarModel:
             return "blocked"
         self.moves_seen += 1
         groups = [g for g in find_translations(before, after, mask) if g.explained >= MIN_EXPLAINED]
+        self._count_instances(after)
+        groups = self._drop_echoes(groups)
         tracked = None
         if self.last_cells and self.template and _matches(before, self.template, self.last_cells):
             tracked = self.last_cells
-        moved_sigs = {sig for g in groups for sig in g.signatures}
+        moved_sigs = {coarse(sig) for g in groups for sig in g.signatures}
         for g in groups:
-            for sig in g.signatures:
+            for sig in {coarse(s) for s in g.signatures}:
                 self.moves[sig][action][(g.dy, g.dx)] += 1
         for sig in list(self.moves):              # known objects that stayed put under this key
             if sig not in moved_sigs:
@@ -82,19 +92,47 @@ class AvatarModel:
         return "moved"
 
     def _elect(self) -> None:
-        """Pick the avatar: the controllable signature with the most evidence."""
+        """Pick the avatar: the controllable signature with the most evidence; among equals the
+        rarer one (the thing a player controls is usually unique on the screen; floor tiles,
+        which echo its moves, are many)."""
         best = None
         for sig in self.controllable:
             votes = sum(sum(c.values()) for c in self.moves[sig].values())
-            if best is None or votes > best[0]:
-                best = (votes, sig)
+            # ties: the rarer thing, then the bigger one (a one-cell mark riding on the avatar
+            # moves with it but is not it)
+            key = (votes, -self.instances.get(sig, 1), sig[1])
+            if best is None or key > best[0]:
+                best = (key, sig)
         self.signature = best[1] if best else None
+
+    def _count_instances(self, grid: np.ndarray) -> None:
+        vals, counts = np.unique(grid, return_counts=True)
+        bg = int(vals[int(np.argmax(counts))])
+        self.instances = Counter((int(o.color), int(o.size)) for o in segment_objects(grid, background=bg))
+
+    def _drop_echoes(self, groups):
+        """A floor tile revealed where the avatar stood 'moves' by the opposite vector into the
+        avatar's old cells. Of two groups that swap places, the one with more look-alikes on
+        the frame is the floor; it is not a mover."""
+        drop = set()
+        for i, g in enumerate(groups):
+            for j, h in enumerate(groups):
+                if i == j or (g.dy, g.dx) != (-h.dy, -h.dx):
+                    continue
+                landed = {(y + h.dy, x + h.dx) for (y, x) in h.cells}
+                if len(set(g.cells) & landed) < 0.5 * len(g.cells):
+                    continue
+                g_inst = max(self.instances.get(coarse(s), 1) for s in g.signatures) if g.signatures else 1
+                h_inst = max(self.instances.get(coarse(s), 1) for s in h.signatures) if h.signatures else 1
+                if g_inst > h_inst:
+                    drop.add(i)
+        return [g for i, g in enumerate(groups) if i not in drop]
 
     def _my_group(self, groups, tracked):
         if self.signature is None:
             return None
         for g in groups:
-            if self.signature in g.signatures:
+            if self.signature in {coarse(s) for s in g.signatures}:
                 return g
         if tracked is not None:  # appearance changed: follow by overlap instead
             for g in groups:
@@ -152,10 +190,18 @@ class AvatarModel:
                 if all(grid[y + dy, x + dx] == c for (dy, dx), c in self.template.items()):
                     cells = frozenset((y + dy, x + dx) for (dy, dx) in offsets)
                     candidates.append((abs(y - anchor_y) + abs(x - anchor_x), cells))
+        if not candidates and self.signature is not None:
+            vals, counts = np.unique(grid, return_counts=True)
+            bg = int(vals[int(np.argmax(counts))])
+            for o in segment_objects(grid, background=bg):
+                if (int(o.color), int(o.size)) == self.signature:
+                    cells = frozenset((int(y), int(x)) for (y, x) in o.cells)
+                    candidates.append((abs(o.anchor[0] - anchor_y) + abs(o.anchor[1] - anchor_x), cells))
         if not candidates:
             return frozenset()
         candidates.sort(key=lambda c: c[0])
         self.last_cells = candidates[0][1]
+        self.template = _template(grid, self.last_cells)
         return self.last_cells
 
     def predict_cells(self, cells: Cells, action: int) -> Cells | None:

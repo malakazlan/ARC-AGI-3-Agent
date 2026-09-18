@@ -22,7 +22,7 @@ from arc3.perception import GridObject, segment_objects, shape_key
 from arc3.plan import plan_moves
 from arc3.rules import Goal, RuleStore, display_pairs, extract_events, match_progress, match_report
 from arc3.types import ActionChoice, ActionKey, Observation
-from arc3.world_model import cells_ahead
+from arc3.world_model import swept_cells
 
 MOVE_KEYS = (1, 2, 3, 4)
 SMALL = 16          # cells; larger objects are walls, floors or panels
@@ -358,7 +358,7 @@ class RulePolicy:
         # adjacent or inside: the press that brings the avatar closest to the centre
         best = None
         for key, vec in self.explorer._known_vectors().items():
-            if not (cells_ahead(avatar, vec) & box):
+            if not (swept_cells(avatar, vec) & box):
                 continue
             moved = {(y + vec[0], x + vec[1]) for (y, x) in avatar}
             cy = sum(y for y, _ in moved) / len(moved); cx = sum(x for _, x in moved) / len(moved)
@@ -494,7 +494,7 @@ class RulePolicy:
         vectors = ex._known_vectors()
         target_cells = set(target.cells)
         for key, vec in vectors.items():
-            if cells_ahead(cells, vec) & target_cells:
+            if swept_cells(cells, vec) & target_cells:
                 self.plan = []
                 self.pending_touch = (_sig(target), key, frozenset(target.cells))
                 energy = ex.energy
@@ -504,7 +504,8 @@ class RulePolicy:
             key = self.plan.pop(0)
             return ActionChoice(key, None, None, f"rules: walk to {purpose} ({len(self.plan)} left)")
         path = plan_moves(grid, cells, vectors, ex.passability,
-                          goal=lambda c: any(cells_ahead(c, v) & target_cells for v in vectors.values()))
+                          goal=lambda c: any(swept_cells(c, v) & target_cells for v in vectors.values()),
+                          forbidden=ex.lethal_moves)
         if not path:
             return None
         self.plan = list(path)

@@ -98,6 +98,26 @@ def _match(objs_b: list[GridObject], objs_a: list[GridObject]) -> list[tuple[Gri
             ob, oa = lb[i], la[j]
             d = (oa.anchor[0] - ob.anchor[0], oa.anchor[1] - ob.anchor[1])
             pairs.append((ob, oa, d))
+    # second pass: objects left unmatched whose exact shape changed (an avatar that turns, a
+    # ring whose gap moves) still pair by colour, size and box size; the displacement then
+    # comes from the box corner, which does not move with the shape's interior
+    matched_b = {id(ob) for ob, _, _ in pairs}
+    matched_a = {id(oa) for _, oa, _ in pairs}
+    rest_b = [o for o in objs_b if id(o) not in matched_b]
+    rest_a = [o for o in objs_a if id(o) not in matched_a]
+    by_coarse_a: dict[tuple, list[GridObject]] = defaultdict(list)
+    for o in rest_a:
+        by_coarse_a[(o.color, o.size, o.bbox[2] - o.bbox[0], o.bbox[3] - o.bbox[1])].append(o)
+    used: set[int] = set()
+    for ob in rest_b:
+        key = (ob.color, ob.size, ob.bbox[2] - ob.bbox[0], ob.bbox[3] - ob.bbox[1])
+        la = [o for o in by_coarse_a.get(key, []) if id(o) not in used]
+        if not la:
+            continue
+        oa = min(la, key=lambda o: abs(o.bbox[0] - ob.bbox[0]) + abs(o.bbox[1] - ob.bbox[1]))
+        used.add(id(oa))
+        d = (oa.bbox[0] - ob.bbox[0], oa.bbox[1] - ob.bbox[1])
+        pairs.append((ob, oa, d))
     return pairs
 
 
