@@ -85,3 +85,13 @@ Dev machine: i5-7300HQ, 4 cores, 7.7 GB RAM in WSL. Benchmarks with many seeds w
 - Next: step 2, passability per colour + A* between frontier states with the mismatch check;
   merge metric re-test share < 20% (keyboard and click reported separately) and median actions
   per won level down 2x.
+
+## 2026-09-18 — Step 2 (movement planner), checkpoint
+
+- Built: passability per colour, controllability-based avatar, BFS over predicted positions,
+  mismatch reset with logging, partial strokes, bar-only expiry. 143 tests.
+- Dev: 9 median levels, RHAE 0.37 (flat). sp80 seed 0: 559 -> 74 actions for level 1 with 0
+  mispredictions. Overall re-test share still ~75%: non-move keys (cn04 A5 710/1000, re86 503)
+  and clicks are tested per state; m0r0/ls20 passability undecidable by colour.
+- Merge criterion not met; plan is to extend prediction to key and click effects by signature
+  and plan over predicted states (owner decision pending).

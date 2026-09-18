@@ -79,3 +79,11 @@ Implementation details belong in DECISIONS.md, not here. Mark unverified beliefs
   is. A blocked key with the frame changing elsewhere is the cheapest passability fact there
   is. Where clicks act on the thing clicked, an object signature predicts the outcome nearly
   perfectly (lp85 93%, sb26 95%); where position or timing decides, it predicts nothing.
+- 2026-09-18 (step 2, `2026-09-18-planner2-dev`) — Controllability is the right definition of
+  "avatar": on sp80 the model first latched onto drifting bars that move on every step; once
+  the avatar had to be the object whose displacement depends on the key, mispredictions went
+  from 80 to 0 and level 1 took 74 actions instead of 559. Two limits of colour-level
+  passability showed up: on m0r0 and ls20 the same colour both passes and blocks (blocking is
+  a property of objects or tracks, not cells), and a deterministic policy dies at identical
+  step counts for non-budget reasons, so clocks must never decide expiry. The remaining
+  re-tests are non-move keys and clicks tested per state: the planner must predict those too.

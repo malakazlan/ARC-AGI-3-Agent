@@ -1,28 +1,19 @@
-# 2026-09-18-planner2-dev
+# 2026-09-18-planner2-dev (step 2: movement planner, controllability-based avatar)
 
-- What changed: TODO
-- Result vs baseline: TODO
-- Keep or drop: TODO
-
-```
-game   levels/seed    med lv med score  actions  states  wall s
-cn04   [0, 1, 0]           0       0.0     1000   231.7    6.92
-ft09   [0, 1, 0]           0       0.0     1000   159.7     4.7
-g50t   [0, 0, 0]           0       0.0     1000    58.3    9.35
-ka59   [0, 0, 0]           0       0.0     1000   239.7    6.88
-lp85   [1, 1, 1]           1      1.82     1000     9.7    2.09
-ls20   [0, 0, 0]           0       0.0     1000   760.3   11.23
-m0r0   [0, 1, 1]           1      0.01     1000    67.7   17.75
-r11l   [1, 1, 1]           1      4.76     1000     255    6.07
-re86   [0, 0, 0]           0       0.0     1000   279.7    3.83
-s5i5   [1, 0, 1]           1       0.0     1000     101    2.74
-sb26   [0, 0, 0]           0       0.0     1000     320   12.66
-sc25   [0, 0, 0]           0       0.0     1000   562.7   10.21
-sk48   [0, 0, 0]           0       0.0     1000     462   10.67
-sp80   [1, 1, 1]           1      0.04     1000   148.7   10.87
-su15   [1, 1, 1]           1       0.0     1000     277    5.51
-tu93   [1, 1, 1]           1       0.0     1000      39    8.05
-vc33   [2, 2, 2]           2      0.05     1000   167.7    5.38
-wa30   [0, 0, 0]           0       0.0     1000     190    6.68
-TOTAL  games=18 seeds=3 sum_median_levels=9 mean_median_score=0.37 actions/level=2000.0 wall=424.8s fallbacks=0
-```
+- What changed: `planner` flag. Avatar = the object whose displacement depends on the key
+  (autonomous drifters excluded); per-colour passability from executed moves (passes / blocks /
+  kills, partial strokes vote blocks beyond); predictable moves are never re-tested; BFS over
+  predicted positions to the nearest unknown terrain; 3 mispredictions disable planning for the
+  level (logged as `planner_resets`). Expiry is now read from the bar only (the clock rule
+  looped a deterministic policy into rebuilding its graph forever).
+- Merge criterion (owner): re-test share < 20% and median actions per won level down 2x.
+- Result: dev 3 seeds, 1000 choices: **9 median levels** (prior 9, first planner run 10), RHAE
+  0.37 flat. cn04 level 1 won for the first time on one seed; tu93 median 2 -> 1.
+  Accounting (seed 0): sp80 level 1 in **74 actions** (was 559, human 39) with 0 mispredictions;
+  but re-test share overall is still ~75% because (a) non-move keys are re-tested per state
+  (cn04 ACTION5 710 of 1000, re86 503), (b) colour-level passability is undecidable on m0r0 and
+  ls20 (mixed votes: blocking there is not a cell-colour property), (c) the avatar is
+  recognised late on ls20 (259), re86 (124), tu93 (111).
+- Keep or drop: keep the code behind the flag (no regression, mechanism demonstrated), criterion
+  **not met**. Completion needs prediction for non-move keys and clicks (effects by signature)
+  and a planner over predicted states, not only positions.
