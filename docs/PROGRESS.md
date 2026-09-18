@@ -179,3 +179,17 @@ Dev machine: i5-7300HQ, 4 cores, 7.7 GB RAM in WSL. Benchmarks with many seeds w
 - Fixes on the way: a walk plan is dropped when the avatar stops moving (ls20 pressed into a
   wall five times); the bar's last cell no longer counts against the rarity of same-shaped
   refills.
+
+## 2026-09-19 - Route planner, transports, matcher fixes
+
+- Dev, 3 seeds: **17 median levels, RHAE 1.37** (`2026-09-19-route-dev`; 14 / 1.35 before).
+  New levels on m0r0, sc25 and g50t, all from the world-model fixes found in the ls20 level-3
+  autopsy (far pairing, block check, contradiction halving). 231 tests.
+- ls20 L3 remains open with a precise picture: two conveyors (entering tile (0,0) -> (0,5);
+  up from (1,9) -> (8,9)), two consumable rings, a rotator needing two presses, a rainbow
+  colour dial, the goal box bottom-right; a 42-move route exists. The agent learns the first
+  conveyor and the rainbow but not the second conveyor, and the four refinements tried after
+  the bench each slowed level 2 and were reverted (see INSIGHTS).
+- Next: the second-conveyor discovery as an "infeasible route -> explore the nearest unknown
+  terrain" rule measured one change at a time on the clean runner; then the click-context
+  signature for su15 (gravity clicks) and the T1 template for click dials (ft09 legends).

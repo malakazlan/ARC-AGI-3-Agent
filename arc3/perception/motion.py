@@ -45,8 +45,11 @@ def find_translations(before: np.ndarray, after: np.ndarray, mask: np.ndarray | 
     bg = _most_common(b)
     pairs = _match(segment_objects(b, background=bg), segment_objects(a, background=bg))
     by_d: dict[tuple[int, int], list] = defaultdict(list)
-    for ob, oa, d in pairs:
-        if d != (0, 0) and max(abs(d[0]), abs(d[1])) <= window:
+    for ob, oa, d, unique in pairs:
+        # the window guards against spurious pairings among many alike objects; the only
+        # object of its kind that vanished here and appeared there is unambiguous at any
+        # distance (a conveyor carries the ls20 avatar 25 cells in one step)
+        if d != (0, 0) and (unique or max(abs(d[0]), abs(d[1])) <= window):
             by_d[d].append((ob, oa))
     total = float(diff.sum())
     groups: list[Translation] = []
@@ -74,8 +77,9 @@ def find_translation(before: np.ndarray, after: np.ndarray, mask: np.ndarray | N
     return groups[0] if groups else None
 
 
-def _match(objs_b: list[GridObject], objs_a: list[GridObject]) -> list[tuple[GridObject, GridObject, tuple[int, int]]]:
-    """Pair objects with the same (colour, shape, size), nearest anchors first."""
+def _match(objs_b: list[GridObject], objs_a: list[GridObject]) -> list[tuple[GridObject, GridObject, tuple[int, int], bool]]:
+    """Pair objects with the same (colour, shape, size), nearest anchors first. The last item
+    says whether the pair was the only object of its kind on both frames."""
     by_sig_b: dict[tuple, list[GridObject]] = defaultdict(list)
     by_sig_a: dict[tuple, list[GridObject]] = defaultdict(list)
     for o in objs_b:
@@ -97,12 +101,12 @@ def _match(objs_b: list[GridObject], objs_a: list[GridObject]) -> list[tuple[Gri
             used_b.add(i); used_a.add(j)
             ob, oa = lb[i], la[j]
             d = (oa.anchor[0] - ob.anchor[0], oa.anchor[1] - ob.anchor[1])
-            pairs.append((ob, oa, d))
+            pairs.append((ob, oa, d, len(lb) == 1 and len(la) == 1))
     # second pass: objects left unmatched whose exact shape changed (an avatar that turns, a
     # ring whose gap moves) still pair by colour, size and box size; the displacement then
     # comes from the box corner, which does not move with the shape's interior
-    matched_b = {id(ob) for ob, _, _ in pairs}
-    matched_a = {id(oa) for _, oa, _ in pairs}
+    matched_b = {id(ob) for ob, _, _, _ in pairs}
+    matched_a = {id(oa) for _, oa, _, _ in pairs}
     rest_b = [o for o in objs_b if id(o) not in matched_b]
     rest_a = [o for o in objs_a if id(o) not in matched_a]
     by_coarse_a: dict[tuple, list[GridObject]] = defaultdict(list)
@@ -117,7 +121,7 @@ def _match(objs_b: list[GridObject], objs_a: list[GridObject]) -> list[tuple[Gri
         oa = min(la, key=lambda o: abs(o.bbox[0] - ob.bbox[0]) + abs(o.bbox[1] - ob.bbox[1]))
         used.add(id(oa))
         d = (oa.bbox[0] - ob.bbox[0], oa.bbox[1] - ob.bbox[1])
-        pairs.append((ob, oa, d))
+        pairs.append((ob, oa, d, False))
     return pairs
 
 

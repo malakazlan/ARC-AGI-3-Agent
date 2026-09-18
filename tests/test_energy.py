@@ -91,3 +91,12 @@ def test_explorer_knows_the_bar_before_the_first_death():
         obs = game.apply(choice.action_id, choice.x, choice.y)
     assert seen_before_death
     assert brain.policy.energy is not None and brain.policy.energy.capacity >= 5
+
+
+def test_an_unknown_second_dial_is_probed_as_a_stop_of_the_route():
+    """Shape dial known, colour still wrong and its dial unknown: the nearest untouched object
+    is planned as a probe stop of the route (not walked to greedily), and the level is won."""
+    game = DisplayToy(energy=40, exit_in_target=True, colour_dial=True)
+    brain, _ = run(game, steps=250)
+    assert game.levels_completed == 1
+    assert brain.policy.diagnostics.get("route_probes", 0) >= 1

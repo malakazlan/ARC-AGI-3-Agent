@@ -11,6 +11,7 @@ from dataclasses import dataclass, field
 
 import numpy as np
 
+STRONG_VOTES = 20   # evidence this large survives a single contradiction (halved, not erased)
 DECIDING_VOTES = 3
 KILL_VOTES = 1  # one death is enough for a player
 
@@ -34,7 +35,17 @@ class PassabilityModel:
         setattr(v, kind, getattr(v, kind) + 1)
 
     def contradict(self, colour: int) -> None:
-        self.votes.pop(int(colour), None)
+        """A prediction about this colour failed. Weak evidence is dropped; strong evidence is
+        halved, so one misread (a ride reported as a block) does not erase a floor colour."""
+        v = self.votes.get(int(colour))
+        if v is None:
+            return
+        if v.passes + v.blocks + v.kills < STRONG_VOTES:
+            self.votes.pop(int(colour), None)
+            return
+        v.passes //= 2
+        v.blocks //= 2
+        v.kills //= 2
 
     def lethal(self, colour: int) -> bool | None:
         v = self.votes.get(int(colour))

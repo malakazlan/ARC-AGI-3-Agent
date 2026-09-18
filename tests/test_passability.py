@@ -116,3 +116,20 @@ def test_a_blocked_press_blames_the_first_unknown_footprint_on_the_path():
     for _ in range(3):
         model.vote(7, "passes")
     assert first_obstacle_colours(g, frozenset({(1, 0)}), (0, 3), model) == {8}
+
+
+def test_a_contradiction_weakens_strong_evidence_instead_of_erasing_it():
+    """One misread (a conveyor ride reported as blocked) must not erase a floor colour that
+    carried the avatar a thousand times; weak evidence is still dropped."""
+    from arc3.world_model import PassabilityModel
+
+    m = PassabilityModel()
+    for _ in range(200):
+        m.vote(3, "passes")
+    m.contradict(3)
+    assert m.passable(3) is True
+    m2 = PassabilityModel()
+    for _ in range(3):
+        m2.vote(7, "passes")
+    m2.contradict(7)
+    assert m2.passable(7) is None

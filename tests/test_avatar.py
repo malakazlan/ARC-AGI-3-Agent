@@ -29,3 +29,27 @@ def test_the_floor_tile_revealed_behind_the_avatar_is_not_the_avatar():
     assert model.signature[0] == 9
     assert model.vector(4) == (0, 6)
     assert model.vector(3) == (0, -6)
+
+
+def test_a_tracked_avatar_carried_far_away_is_a_move_not_a_block():
+    """ls20 conveyor: the avatar leaves its cells and reappears 25 cells away. The model must
+    report a move with that vector, not a block (a block wipes the floor's passability)."""
+    import numpy as np
+
+    from arc3.world_model import AvatarModel
+
+    def frame(row: int, col: int) -> np.ndarray:
+        g = np.full((30, 50), 3, dtype=np.int8)
+        g[row:row + 5, col:col + 5] = 9
+        return g
+
+    model = AvatarModel()
+    pos = (0, 2)
+    for key, (dy, dx) in ((4, (0, 5)), (2, (5, 0)), (4, (0, 5)), (2, (5, 0)), (4, (0, 5))):
+        nxt = (pos[0] + dy, pos[1] + dx)
+        model.observe(frame(*pos), key, frame(*nxt))
+        pos = nxt
+    assert model.confident
+    outcome = model.observe(frame(*pos), 4, frame(pos[0], pos[1] + 25))
+    assert outcome == "moved"
+    assert model.last_vector[4] == (0, 25)

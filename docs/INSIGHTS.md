@@ -199,3 +199,20 @@ Implementation details belong in DECISIONS.md, not here. Mark unverified beliefs
   changed its level-2 walk from a median of 40 actions to 190 over 12 seeds, without any
   code path that should depend on order. Treat every ordering change as a behavioural change
   and measure it on 6+ seeds.
+- 2026-09-19 (ls20 conveyors, matcher window, contradictions) - A conveyor ride looked like a
+  blocked press: the matcher's 8-cell window refused the 25-cell pairing, the avatar model
+  said "blocked", the explorer counted a misprediction against the floor colour and erased
+  its 1479 passes; every later walk was unplannable. Three rules came out of it: the only
+  object of its kind pairs at any distance; "blocked" requires the avatar to still stand where
+  it was; a contradiction halves strong evidence and erases only weak evidence. Unexpected
+  landings are now transports (portals) for both planners. Dev 14 -> 17 median levels: the
+  same misreads were costing m0r0, sc25 and g50t, not only ls20.
+- 2026-09-19 (route planner, what did not work) - Four plausible refinements each lost ls20
+  level 2 (45 -> 97 actions) in a clean run and were reverted: counting unknown colours as
+  walls in the route distances, planning the exit to its whole box instead of its centre,
+  charging two presses for a dial under the avatar, and listing every refill instance. The
+  lesson is procedural, not about any one of them: a change to distances or stop costs moves
+  every later choice, so it must be measured on the clean runner before the next edit, one at
+  a time. Also: an instrumented probe that calls policy methods (walks, routes) is not a
+  read-only observer; the committed code "lost" level 2 under the instrumented probe and won
+  it under a clean one.

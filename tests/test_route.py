@@ -75,3 +75,14 @@ def test_cell_route_length_reaches_a_goal_cell_within_one_step_and_reports_unrea
     # tiles of 5: from (2,2) to (2,12) is two jumps; the goal is a wall cell next to the lattice
     walk[2, 13] = False
     assert cell_route_length(walk, (2, 2), (2, 13), step=5) == 2
+
+
+def test_cell_route_length_rides_a_known_portal():
+    import numpy as np
+    from arc3.plan.route import cell_route_length
+
+    walk = np.ones((10, 30), dtype=bool)
+    walk[:, 15] = False                        # a full wall
+    portals = {(5, 5): (5, 25)}                # landing on (5,5) carries the avatar across
+    assert cell_route_length(walk, (5, 0), (5, 28), step=5) is None
+    assert cell_route_length(walk, (5, 0), (5, 28), step=5, portals=portals) == 1

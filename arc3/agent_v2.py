@@ -21,6 +21,7 @@ from arc3.explore import GraphExplorer
 from arc3.perception import GridObject, segment_objects, shape_key
 from arc3.plan import plan_moves
 from arc3.world_model import predict_move
+from arc3.rules.probes import rank_probes
 from arc3.plan.route import Stop, cell_route_length, plan_route
 from arc3.rules import Goal, RuleStore, display_pairs, extract_events, match_progress, match_report
 from arc3.types import ActionChoice, ActionKey, Observation
@@ -38,6 +39,10 @@ Cells = frozenset[tuple[int, int]]
 def _centre(bbox: tuple) -> tuple[int, int]:
     y0, x0, y1, x1 = bbox
     return ((y0 + y1) // 2, (x0 + x1) // 2)
+
+
+def _cells_centre(cells) -> tuple[int, int]:
+    return (int(round(sum(y for y, _ in cells) / len(cells))), int(round(sum(x for _, x in cells) / len(cells))))
 
 
 def _sig(o: GridObject) -> tuple:
@@ -311,23 +316,42 @@ class RulePolicy:
             # the dial for a property that still mismatches; none known: probe something new
             wanted = [p for p, ok in self.last_report.items() if not ok]
             dials: list[GridObject] = []
+            covered: set = set()
             for sig, t in self.store.tools.items():
                 if t.kind == "dial" and t.params.get("prop") in wanted:
                     found = self._find_tool(grid, sig)
                     if found is not None:
                         dials.append(found)
-            tool = dials[0] if dials else None
-            if tool is None:
-                probe, had_candidates = self._probe_unknown(observation)
-                if probe is not None:
-                    return probe
-                if had_candidates:
-                    return None   # something to probe, just not reachable from here: let the explorer move
+                        covered.add(t.params.get("prop"))
+            # a property with no known dial: the nearest untouched object is a probe stop
+            probes: list[GridObject] = []
+            if any(p not in covered for p in wanted):
+                probes = self._probe_candidates(grid, pair)[:1]
+            if not dials and not probes:
                 self._demote()
                 return None
-            choice = self._follow_route(observation, dials, pair)
+            choice, status = self._follow_route(observation, dials, probes, pair)
+            if choice is None and status == "infeasible":
+                # no order of the stops fits the bar as far as we know: something is missing (a
+                # shortcut, a refill). Spend what is left on the nearest unknown thing instead of
+                # walking to a death: what it does is learned for the next attempt.
+                self.diagnostics["route_infeasible"] = self.diagnostics.get("route_infeasible", 0) + 1
+                for cand in self._probe_candidates(grid, pair)[:3]:
+                    choice = self._touch_or_walk(observation, cand, purpose="probe")
+                    if choice is not None:
+                        if choice.reason.startswith("rules: touch probe"):
+                            self.probed.add(_sig(cand))
+                            self.diagnostics["probes"] += 1
+                        self.diagnostics["route_probes"] = self.diagnostics.get("route_probes", 0) + 1
+                        return choice
             if choice is None:
-                choice = self._go(observation, tool, purpose="dial")
+                if dials:
+                    choice = self._go(observation, dials[0], purpose="dial")
+                else:
+                    choice, had_candidates = self._probe_unknown(observation)
+                    if choice is None and not had_candidates:
+                        self._demote()
+                    return choice
             if choice is not None and choice.reason.startswith("rules: touch dial"):
                 self.touches += 1
             return choice
@@ -348,35 +372,52 @@ class RulePolicy:
         self._demote()
         return None
 
-    def _follow_route(self, observation: Observation, dials: list[GridObject], pair) -> ActionChoice | None:
-        """One step along the cheapest feasible order of the dials, the display exit and the
-        refills (design v2 section 6). None when no route fits or the first leg is unreachable:
-        the caller falls back to the greedy leg-by-leg rule."""
+    def _follow_route(self, observation: Observation, dials: list[GridObject], probes: list[GridObject],
+                      pair) -> tuple[ActionChoice | None, str]:
+        """One step along the cheapest feasible order of the dials, the probes, the display
+        exit and the refills (design v2 section 6). Status: "ok", "infeasible" (no order fits
+        the bar) or "unreachable" (no stop can be walked to, or the first leg has no path)."""
         grid = observation.grid
         stops = [Stop(f"dial{i}", _centre(d.bbox)) for i, d in enumerate(dials)]
+        stops += [Stop(f"probe{i}", _centre(o.bbox)) for i, o in enumerate(probes)]
+        cells: dict[tuple, tuple] = {}   # stops are planned to their centres (see the note on the exit)
         if not self.display_exit_tried:
+            # the exit is planned to its centre: widening it to the whole box made the route's
+            # first leg cross the box frame and cost ls20 level 2 (three mispredictions)
             stops.append(Stop("exit", _centre(pair.static_box), final=True))
-        route = self._route(observation, stops)
+        route, reachable = self._route(observation, stops, cells)
         if not route:
-            return None
+            return None, ("infeasible" if reachable else "unreachable")
         self.diagnostics["route_steps"] = self.diagnostics.get("route_steps", 0) + 1
         first = route[0]
+        choice = None
         if first.name == "refill":
             for cand in self._refill_candidates(grid):
                 if _centre(cand.bbox) == first.at:
                     self.diagnostics["route_refills"] = self.diagnostics.get("route_refills", 0) + 1
-                    return self._touch_or_walk(observation, cand, purpose="refill")
-            return None
-        if first.name.startswith("dial"):
-            return self._touch_or_walk(observation, dials[int(first.name[4:])], purpose="dial")
-        return None
+                    choice = self._touch_or_walk(observation, cand, purpose="refill")
+                    break
+        elif first.name.startswith("dial"):
+            choice = self._touch_or_walk(observation, dials[int(first.name[4:])], purpose="dial")
+        elif first.name.startswith("probe"):
+            target = probes[int(first.name[5:])]
+            choice = self._touch_or_walk(observation, target, purpose="probe")
+            if choice is not None and choice.reason.startswith("rules: touch probe"):
+                self.probed.add(_sig(target))
+                self.diagnostics["probes"] += 1
+                self.diagnostics["route_probes"] = self.diagnostics.get("route_probes", 0) + 1
+        return choice, ("ok" if choice is not None else "unreachable")
 
-    def _route(self, observation: Observation, stops: list[Stop]) -> list[Stop] | None:
+    def _route(self, observation: Observation, stops: list[Stop],
+               cells: dict[tuple, tuple] | None = None) -> tuple[list[Stop] | None, bool]:
+        """The route and whether any stop is reachable at all from where the avatar stands.
+        `cells` maps a stop position to the object's cells (the goal is to get next to any)."""
+        cells = cells or {}
         grid = observation.grid
         ex = self.explorer
         avatar = ex.avatar.avatar_cells(grid) if ex.avatar else frozenset()
         if not avatar:
-            return None
+            return None, False
         start = (int(round(sum(y for y, _ in avatar) / len(avatar))),
                  int(round(sum(x for _, x in avatar) / len(avatar))))
         vectors = ex._known_vectors()
@@ -385,10 +426,11 @@ class RulePolicy:
         for (y, x) in avatar:
             walk[y, x] = True
         cache: dict[tuple, int | None] = {}
+        portals = {_cells_centre(src): _cells_centre(dst) for src, dst in ex.transports.items()}
 
         def dist(a, b):
             if (a, b) not in cache:
-                cache[(a, b)] = cell_route_length(walk, a, b, step)
+                cache[(a, b)] = cell_route_length(walk, a, b, step, portals, cells.get(b))
             return cache[(a, b)]
 
         energy = ex.energy
@@ -401,15 +443,23 @@ class RulePolicy:
         else:
             moves_left = capacity = 10 ** 6
             refills = []
-        return plan_route(start, stops, refills, moves_left, capacity, dist)
+        route = plan_route(start, stops, refills, moves_left, capacity, dist)
+        reachable = any(dist(start, st.at) is not None for st in stops)
+        return route, reachable
 
-    def _walkable(self, grid: np.ndarray) -> np.ndarray:
-        """Cells the avatar may stand on: every colour not known to block or kill, minus the bar."""
+    def _walkable(self, grid: np.ndarray, optimistic: bool = True) -> np.ndarray:
+        """Cells the avatar can stand on: everything not known to block or kill (default), or
+        only colours voted passable (strict). Never lethal colours, never the bar. Strict route
+        distances starved ls20 level 2 (45 -> 97 actions), so routes stay optimistic and the
+        exact planner guards the first leg."""
         ex = self.explorer
-        walk = np.ones(grid.shape, dtype=bool)
+        walk = np.zeros(grid.shape, dtype=bool)
         for colour in np.unique(grid):
-            if ex.passability.passable(int(colour)) is False or ex.passability.lethal(int(colour)):
-                walk[grid == colour] = False
+            c = int(colour)
+            known = ex.passability.passable(c)
+            ok = (known is not False) if optimistic else (known is True)
+            if ok and not ex.passability.lethal(c):
+                walk[grid == colour] = True
         if ex.mask is not None and ex.mask.shape == grid.shape:
             walk &= ~ex.mask
         return walk
@@ -435,10 +485,9 @@ class RulePolicy:
         any candidate existed at all, reachable or not."""
         grid = observation.grid
         had = False
-        for cand in self._salient(grid):
+        pair = self.store.goal.params.get("pair") if self.store.goal is not None else None
+        for cand in self._probe_candidates(grid, pair):
             sig = _sig(cand)
-            if sig in self.probed or sig in self.store.tools:
-                continue
             had = True
             choice = self._go(observation, cand, purpose="probe")
             if choice is not None:
@@ -448,6 +497,22 @@ class RulePolicy:
                     self.diagnostics["delta_probes"] = self.diagnostics.get("delta_probes", 0) + 1
                 return choice, True
         return None, had
+
+    def _probe_candidates(self, grid: np.ndarray, pair=None) -> list[GridObject]:
+        """Untouched salient objects the avatar can reach, most promising first (multi-colour
+        icons before plain marks, then smaller, then nearer); never a piece of the displays."""
+        ex = self.explorer
+        avatar = ex.avatar.avatar_cells(grid) if ex.avatar else frozenset()
+        objects = [c for c in self._salient(grid)
+                   if _sig(c) not in self.probed and _sig(c) not in self.store.tools
+                   and (pair is None or not self._in_display(c, pair))]
+        if not avatar:
+            return objects
+        walk = self._walkable(grid)
+        for (y, x) in avatar:
+            walk[y, x] = True
+        return rank_probes(objects, walk, avatar,
+                           colours_of=lambda o: len({int(grid[y, x]) for (y, x) in o.cells}))
 
     def _anchor_goal(self, grid: np.ndarray) -> None:
         """On a new level, find the displays of the carried goal again: frames of the same
@@ -672,7 +737,7 @@ class RulePolicy:
         known = [sig for sig, t in self.store.tools.items() if t.kind == "refill"]
         out: list[GridObject] = []
         for sig in known:
-            o = self._find(grid, sig)
+            o = self._find(grid, sig)   # TODO: every instance (ring B hides behind ring A on ls20 L3)
             if o is not None:
                 out.append(o)
         if not out and energy is not None and energy.full_colour is not None:

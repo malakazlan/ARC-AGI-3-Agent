@@ -74,9 +74,9 @@ class AvatarModel:
         self._elect()
         mine = self._my_group(groups, tracked)
         if mine is None:
-            if tracked is not None:
+            if tracked is not None and _matches(after, self.template, tracked):
                 self.blocked_votes += 1
-                return "blocked"  # something else moved, not the avatar
+                return "blocked"  # something else moved; the avatar still stands where it was
             return "unexplained"
         self.moves_explained += 1
         self.last_vector[action] = (mine.dy, mine.dx)

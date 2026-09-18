@@ -73,15 +73,21 @@ def plan_route(start: Pos, stops: list[Stop], refills: list[Pos], moves_left: in
     return None if result is None else list(result[1])
 
 
-def cell_route_length(walkable: np.ndarray, start: Pos, goal: Pos, step: int) -> int | None:
+def cell_route_length(walkable: np.ndarray, start: Pos, goal: Pos, step: int,
+                      portals: dict[Pos, Pos] | None = None,
+                      goal_cells: tuple[Pos, ...] | None = None) -> int | None:
     """Moves of `step` cells over walkable cells from `start` until `goal` lies within one move
     (Chebyshev distance <= step): the leg length to a stop that is then touched or entered.
-    None when no such cell can be reached. Every cell swept by a move must be walkable."""
+    None when no such cell can be reached. Every cell swept by a move must be walkable.
+    `portals` maps a landing position to where the game carries the avatar from there.
+    `goal_cells` widens the goal to a whole object: within one move of any of its cells."""
     h, w = walkable.shape
     step = max(1, int(step))
+    portals = portals or {}
+    targets = tuple(goal_cells) if goal_cells else (goal,)
 
     def near(p: Pos) -> bool:
-        return max(abs(p[0] - goal[0]), abs(p[1] - goal[1])) <= step
+        return any(max(abs(p[0] - gy), abs(p[1] - gx)) <= step for (gy, gx) in targets)
 
     if near(start):
         return 0
@@ -95,6 +101,9 @@ def cell_route_length(walkable: np.ndarray, start: Pos, goal: Pos, step: int) ->
                 continue
             sy, sx = (dy > 0) - (dy < 0), (dx > 0) - (dx < 0)
             if not all(walkable[y + sy * i, x + sx * i] for i in range(1, step + 1)):
+                continue
+            ny, nx = portals.get((ny, nx), (ny, nx))
+            if (ny, nx) in seen:
                 continue
             if near((ny, nx)):
                 return d + 1

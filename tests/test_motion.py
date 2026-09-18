@@ -222,3 +222,15 @@ def test_one_key_alone_cannot_establish_control():
     for k, action in enumerate(actions):
         model.observe(frames[k], action, frames[k + 1])
     assert not model.confident
+
+
+def test_a_unique_object_pairs_across_any_distance():
+    """A conveyor carries the only object of its kind 25 cells in one step (ls20): the
+    displacement is unambiguous, so the window does not apply."""
+    import numpy as np
+    from arc3.perception.motion import find_translations
+
+    before = np.zeros((20, 40), dtype=np.int8); before[5:10, 2:7] = 9
+    after = np.zeros((20, 40), dtype=np.int8); after[5:10, 27:32] = 9
+    groups = find_translations(before, after)
+    assert [(g.dy, g.dx) for g in groups] == [(0, 25)]
