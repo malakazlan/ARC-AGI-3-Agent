@@ -188,3 +188,21 @@ through 3.3 and 3.5 and is not predicted here.
    and dev levels (kill metric of 3.2).
 3. Win hypothesis capture and replay on level 2+ (kill metric of 3.3).
 4. Click candidates where position matters (3.5), then state-conditional commits (3.4).
+
+## 7. Review conditions (owner, 2026-09-18) — accepted, they amend the sections above
+
+- **Click games are in scope of step 1.** An action is (ACTION6, object). Click effects are
+  generalised by object signature (colour + shape + size), not per state; a signature whose
+  click effect is consistent k=3 times is global. Re-test share is measured separately for
+  click games.
+- **Passability is learned per target-cell colour** (avatar did not move => the colour it would
+  have entered gets a "blocks" vote), generalised by colour, never per cell. False positives
+  (moving walls, doors that open after a key) are handled by the runtime mismatch check; how
+  often the 3-misprediction reset fires is logged per level and reported.
+- **Win hypotheses are a small set**, not one: reach region / colour match / count reached /
+  object removed / click colour. "One winning colour per game" is one member, ranked by
+  evidence, never the only one.
+- **Merge criterion:** re-test share < 20% and median actions per won level down at least 2x.
+  Level count is secondary; both are reported.
+- **Offline first:** the avatar detector and click-effect consistency are validated on recorded
+  traces against the probe numbers before anything is wired into the agent.
