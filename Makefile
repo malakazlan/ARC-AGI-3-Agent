@@ -24,7 +24,7 @@ SEEDS           ?= 3
 WORKERS         ?= 4
 BENCH_ARGS      ?=
 
-.PHONY: help setup play-local pull-sample notebook submit status verify-local test bench clean _check-kaggle
+.PHONY: help setup play-local pull-sample notebook submit status verify-local test bench reasoner-dry clean _check-kaggle
 
 _check-kaggle:
 	@if [ ! -s .kaggle/access_token ]; then \
@@ -65,6 +65,9 @@ test: ## Run unit tests (fast, no network)
 
 bench: ## Benchmark on a split: make bench SPLIT=dev|holdout SEEDS=3 [BENCH_ARGS="--max-actions 500"]
 	$(VENV_PY) eval/benchmark.py --split $(SPLIT) --seeds $(SEEDS) --workers $(WORKERS) $(BENCH_ARGS)
+
+reasoner-dry: ## Track B dry run: goal-naming harness with the MockClient on 2 games (no network, no model)
+	$(VENV_PY) eval/reasoner_eval.py --games ls20,cn04 --out eval/results/reasoner_mock.json
 
 list-games: ## Show all available games
 	$(VENV_PY) scripts/play_local.py --list

@@ -127,3 +127,29 @@ lethal edges; RESET only after death or when provably stuck.
   we're back to exhaustive. Measure on ft09/lp85.
 - Multi-property goals where one property is hidden until another is set (T6). Progress stalls
   will catch it late; acceptable for now.
+
+## 13. Track B: goal naming by a local VLM (offline experiment)
+Question: can a local vision-language model served by vLLM name the goal of an unseen level
+from a few frames plus our world-model summary? Measured offline only; nothing is wired into
+the agent until the numbers say so. Code: `arc3/reasoner/{summary,prompt,render,client}.py`,
+harness `eval/reasoner_eval.py`, truth `eval/goal_truth.json`, dry run `make reasoner-dry`.
+
+- Inputs per query: the last `--frames` (default 3) grids of the first level, rendered as PNG
+  with the fixed 16-colour palette at 8 px per cell, plus `world_summary` (grid size, the 8
+  most salient objects, avatar if known, key vectors, tools, energy bar, deaths, level, the
+  template list with one-line meanings). Queries at trace indices `--steps 0,3,6,10`, using
+  only what the frames show at that point (no learned vectors or tools yet).
+- Output per query: JSON `{"template": match_display|reach|collect|count_to_zero|make_uniform|other,
+  "goal": one sentence, "progress": what to measure, "next": next sub-goal}`; parsed tolerantly
+  (fences, prose), recorded raw in `eval/results/reasoner_<model>.json`.
+- Metric: per dev game `named_within_10` = some query at step <= 10 names the truth template;
+  also `first_correct_step`. Headline = fraction of dev games named within 10. Truth comes from
+  the coverage table in `docs/GAMES.md`.
+- Decision: >= 50% named within 10 -> wire the VLM as a level-1 fallback that proposes a
+  template when discovery stalls, with the planner executing (the model never picks actions);
+  < 30% -> drop Track B and keep the rules-only discovery. In between: try a bigger model or
+  more frames once, then decide.
+- Kaggle fit: RTX 6000 24 GB or 2xT4 16 GB; a 7B-class VLM at fp16 or AWQ, 10-30 calls per game,
+  a few seconds each, inside the 6 h budget for 100+ games; weights attached as a Kaggle dataset,
+  offline install; permissive licence only (Qwen2.5-VL line is Apache-2.0), recorded in
+  `THIRD_PARTY.md`. Degrades to the rules-only agent when the model is missing or time is tight.

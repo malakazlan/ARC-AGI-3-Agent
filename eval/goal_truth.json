@@ -1,0 +1,20 @@
+{
+  "ls20": {"template": "match_display", "note": "carried glyph must match the goal box glyph, then enter it; energy, rotator, colour dial, refills"},
+  "ft09": {"template": "match_display", "note": "dials are 3x3 mini-maps of neighbours; colour every tile to its target"},
+  "vc33": {"template": "match_display", "note": "buttons move material between chambers; bring the player marker to the matching marker"},
+  "sb26": {"template": "match_display", "note": "fill slots so the flattened nested-box sequence equals the legend; ACTION5 submits"},
+  "sp80": {"template": "match_display", "note": "every stream must end in a castle notch, nothing may reach the grey wall"},
+  "su15": {"template": "match_display", "note": "deliver the HUD-listed objects to the blue delivery slots"},
+  "ka59": {"template": "match_display", "note": "every piece rests on its matching goal outline; pieces slide/launch"},
+  "cn04": {"template": "reach", "note": "select a piece, move/rotate it; win when every prong is paired in a joint"},
+  "g50t": {"template": "reach", "note": "plug the cable/player into the goal socket (blue ring open on one side)"},
+  "wa30": {"template": "count_to_zero", "note": "deposit every blue box inside the lock"},
+  "m0r0": {"template": "reach", "note": "two mirrored agents must stand in the same cell; red cells lethal; keys hold doors open; blocks pushable"},
+  "tu93": {"template": "reach", "note": "reach the green node, avoid guards (static and hunters)"},
+  "sc25": {"template": "reach", "note": "enter the blue C bracket sized like the player; the player can change size"},
+  "re86": {"template": "match_display", "note": "shapes are line sets; cover the four same-colour dots (a plus); ACTION5 switches the active shape"},
+  "lp85": {"template": "other", "note": "click puzzle on a block grid; guide is level-local"},
+  "s5i5": {"template": "other", "note": "'+' buttons rotate segments (children rotate with them); assemble"},
+  "r11l": {"template": "count_to_zero", "note": "put each blob's centre on its matching ring centre"},
+  "sk48": {"template": "other", "note": "chain-arm collector; the legend shows the required arm contents in order"}
+}

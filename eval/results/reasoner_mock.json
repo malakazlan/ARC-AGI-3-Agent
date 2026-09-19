@@ -1,0 +1,130 @@
+{
+ "model": "mock",
+ "endpoint": null,
+ "steps": [
+  0,
+  3,
+  6,
+  10
+ ],
+ "frames": 3,
+ "results": [
+  {
+   "game": "cn04",
+   "step": 0,
+   "raw": "{\"template\": \"reach\", \"goal\": \"Bring the avatar to the marked target.\", \"progress\": \"Distance from the avatar to the target.\", \"next\": \"Move toward the target.\"}",
+   "error": null,
+   "seconds": 0.0,
+   "template": "reach",
+   "goal": "Bring the avatar to the marked target.",
+   "progress": "Distance from the avatar to the target.",
+   "next": "Move toward the target."
+  },
+  {
+   "game": "cn04",
+   "step": 3,
+   "raw": "{\"template\": \"reach\", \"goal\": \"Bring the avatar to the marked target.\", \"progress\": \"Distance from the avatar to the target.\", \"next\": \"Move toward the target.\"}",
+   "error": null,
+   "seconds": 0.0,
+   "template": "reach",
+   "goal": "Bring the avatar to the marked target.",
+   "progress": "Distance from the avatar to the target.",
+   "next": "Move toward the target."
+  },
+  {
+   "game": "cn04",
+   "step": 6,
+   "raw": "{\"template\": \"reach\", \"goal\": \"Bring the avatar to the marked target.\", \"progress\": \"Distance from the avatar to the target.\", \"next\": \"Move toward the target.\"}",
+   "error": null,
+   "seconds": 0.0,
+   "template": "reach",
+   "goal": "Bring the avatar to the marked target.",
+   "progress": "Distance from the avatar to the target.",
+   "next": "Move toward the target."
+  },
+  {
+   "game": "cn04",
+   "step": 10,
+   "raw": "{\"template\": \"reach\", \"goal\": \"Bring the avatar to the marked target.\", \"progress\": \"Distance from the avatar to the target.\", \"next\": \"Move toward the target.\"}",
+   "error": null,
+   "seconds": 0.0,
+   "template": "reach",
+   "goal": "Bring the avatar to the marked target.",
+   "progress": "Distance from the avatar to the target.",
+   "next": "Move toward the target."
+  },
+  {
+   "game": "ls20",
+   "step": 0,
+   "raw": "{\"template\": \"reach\", \"goal\": \"Bring the avatar to the marked target.\", \"progress\": \"Distance from the avatar to the target.\", \"next\": \"Move toward the target.\"}",
+   "error": null,
+   "seconds": 0.0,
+   "template": "reach",
+   "goal": "Bring the avatar to the marked target.",
+   "progress": "Distance from the avatar to the target.",
+   "next": "Move toward the target."
+  },
+  {
+   "game": "ls20",
+   "step": 3,
+   "raw": "{\"template\": \"reach\", \"goal\": \"Bring the avatar to the marked target.\", \"progress\": \"Distance from the avatar to the target.\", \"next\": \"Move toward the target.\"}",
+   "error": null,
+   "seconds": 0.0,
+   "template": "reach",
+   "goal": "Bring the avatar to the marked target.",
+   "progress": "Distance from the avatar to the target.",
+   "next": "Move toward the target."
+  },
+  {
+   "game": "ls20",
+   "step": 6,
+   "raw": "{\"template\": \"reach\", \"goal\": \"Bring the avatar to the marked target.\", \"progress\": \"Distance from the avatar to the target.\", \"next\": \"Move toward the target.\"}",
+   "error": null,
+   "seconds": 0.0,
+   "template": "reach",
+   "goal": "Bring the avatar to the marked target.",
+   "progress": "Distance from the avatar to the target.",
+   "next": "Move toward the target."
+  },
+  {
+   "game": "ls20",
+   "step": 10,
+   "raw": "{\"template\": \"reach\", \"goal\": \"Bring the avatar to the marked target.\", \"progress\": \"Distance from the avatar to the target.\", \"next\": \"Move toward the target.\"}",
+   "error": null,
+   "seconds": 0.0,
+   "template": "reach",
+   "goal": "Bring the avatar to the marked target.",
+   "progress": "Distance from the avatar to the target.",
+   "next": "Move toward the target."
+  }
+ ],
+ "score": {
+  "games": {
+   "cn04": {
+    "truth": "reach",
+    "answers": {
+     "0": "reach",
+     "3": "reach",
+     "6": "reach",
+     "10": "reach"
+    },
+    "named_within_10": true,
+    "first_correct_step": 0
+   },
+   "ls20": {
+    "truth": "match_display",
+    "answers": {
+     "0": "reach",
+     "3": "reach",
+     "6": "reach",
+     "10": "reach"
+    },
+    "named_within_10": false,
+    "first_correct_step": null
+   }
+  },
+  "n_games": 2,
+  "named_within_10": 1,
+  "fraction_named_within_10": 0.5
+ }
+}
