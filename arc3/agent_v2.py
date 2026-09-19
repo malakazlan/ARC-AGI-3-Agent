@@ -32,8 +32,27 @@ SMALL = 16          # cells; larger objects are walls, floors or panels
 RARE = 2            # at most this many objects share a salient signature
 TOUCH_LIMIT = 12    # touches of one dial before the hypothesis is doubted
 ENTRY_LIMIT = 6     # presses into the target display before it is dismissed as the exit
+COLLECT_TRIES = 3   # touches an instance of a consumable may survive before it is left alone
 ICON_SIDE = 4       # pieces of a multi-colour icon fit in a box smaller than this
 Cells = frozenset[tuple[int, int]]
+
+
+def _opening(grid: np.ndarray, bbox: tuple) -> frozenset:
+    """Cells of a frame's border that are not drawn in the frame's colour: the way in. Empty
+    when the border is closed (an ordinary box) or when most of it is missing (not a frame)."""
+    y0, x0, y1, x1 = bbox
+    colour = int(grid[y0, x0]) if grid[y0, x0] == grid[y1, x1] else None
+    border = [(y, x) for y in range(y0, y1 + 1) for x in range(x0, x1 + 1)
+              if y in (y0, y1) or x in (x0, x1)]
+    if colour is None:
+        counts: dict[int, int] = {}
+        for (y, x) in border:
+            counts[int(grid[y, x])] = counts.get(int(grid[y, x]), 0) + 1
+        colour = max(counts, key=counts.get)
+    gap = frozenset((y, x) for (y, x) in border if int(grid[y, x]) != colour)
+    if not gap or len(gap) > len(border) // 2:
+        return frozenset()
+    return gap
 
 
 def _centre(bbox: tuple) -> tuple[int, int]:
@@ -52,6 +71,7 @@ def _sig(o: GridObject) -> tuple:
 class RulePolicy:
     def __init__(self, rng: random.Random, config: Arc3Config) -> None:
         self.rng = rng
+        self.config = config
         self.explorer = GraphExplorer(
             rng=rng, max_nodes=config.max_nodes_per_level, max_clicks=config.max_click_candidates,
             use_countdown_mask=config.countdown_mask, budget_aware=config.budget_aware,
@@ -60,6 +80,8 @@ class RulePolicy:
             dial_cap=config.dial_cap, breadth_first=config.breadth_first,
             click_mask=config.click_mask, click_split=config.click_split, verify_first=config.verify_first,
             verify_predictions=config.verify_predictions, diverse_clicks=config.diverse_clicks,
+            restart_by_frame=config.restart_by_frame,
+            blame_silent_restart=config.blame_silent_restart,
         )
         self.store = RuleStore()
         self.mode = "discover"
@@ -80,7 +102,9 @@ class RulePolicy:
         self.energy_before: int | None = None         # bar reading when we pressed into a tool
         self.ambient_rises = 0                       # bar rises seen while the avatar stood still
         self.refilling = False                       # committed to a refill detour until it lands
-        self.reach_tried: set[tuple] = set()         # reach candidates that did not end the level
+        self.reach_tried: set[tuple] = set()
+        self.collect_presses: dict[tuple, int] = {}   # signature -> touches that took nothing
+        self.terrain_steps = 0                        # explorer actions granted before reach this level         # reach candidates that did not end the level
         self.pending_consumable: tuple | None = None # (signature, cells) covered by the avatar after a touch
         self.reach_target: tuple | None = None       # (signature, box) being entered right now
         self.reach_presses = 0
@@ -143,7 +167,8 @@ class RulePolicy:
                     self.store.set_tool(sig, "no_op" if back else "consumable")
                     if not back:
                         self.diagnostics["consumables"] = self.diagnostics.get("consumables", 0) + 1
-                        self.reach_tried = set()    # the world changed: places refused before may open
+                        self.collect_presses = {}
+                        self.reach_tried = set()
                 self.pending_consumable = None
         if observation.grid is not None and self.last_grid is not None and self.last_grid.shape == observation.grid.shape:
             ys, xs = np.nonzero(observation.grid != self.last_grid)
@@ -191,7 +216,8 @@ class RulePolicy:
                 if left:
                     self.store.set_tool(signature, "consumable")   # touching it takes it: collect
                     self.diagnostics["consumables"] = self.diagnostics.get("consumables", 0) + 1
-                    self.reach_tried = set()        # the world changed: places refused before may open
+                    self.collect_presses = {}
+                    self.reach_tried = set()
                 else:
                     # the avatar covers it: decide when it has moved off (gone = consumable,
                     # back = something we can walk over)
@@ -237,6 +263,8 @@ class RulePolicy:
         self.plan = []
         self.touches = 0
         self.reach_tried = set()
+        self.collect_presses = {}
+        self.terrain_steps = 0
         self._reset_reach()
         self._reset_exit()
 
@@ -300,6 +328,11 @@ class RulePolicy:
         choice = self._discover(observation)
         if choice is not None:
             return choice
+        if (self.terrain_steps < self.config.reach_terrain_budget
+                and any(_sig(c) not in self.probed for c in self._salient(grid))
+                and self._unknown_terrain_left(grid)):
+            self.terrain_steps += 1
+            return None   # something to probe, no path yet, and ground still to learn: the explorer first
         return self._reach(observation, known=None)
 
     # -- exploit (T1) ------------------------------------------------------------------------
@@ -578,10 +611,13 @@ class RulePolicy:
         box = frozenset((y, x) for y in range(y0, y1 + 1) for x in range(x0, x1 + 1))
         centre = ((y0 + y1) // 2, (x0 + x1) // 2)
         avatar = self.explorer.avatar.avatar_cells(grid)  # type: ignore[union-attr]
+        opening = _opening(grid, box_bounds) if (self.config.frame_opening and not (avatar & box)) else frozenset()
         best = None
         for key, vec in self.explorer._known_vectors().items():
             if not (swept_cells(avatar, vec) & box):
                 continue
+            if opening and not (swept_cells(avatar, vec) & opening):
+                continue   # a frame open on one side is entered there, not pushed from a closed side
             moved = {(y + vec[0], x + vec[1]) for (y, x) in avatar}
             cy = sum(y for y, _ in moved) / len(moved); cx = sum(x for _, x in moved) / len(moved)
             dist = abs(cy - centre[0]) + abs(cx - centre[1])
@@ -592,9 +628,10 @@ class RulePolicy:
             self.pending_exit = avatar
             self.pending_touch = None
             return ActionChoice(best[1], None, None, f"rules: touch {purpose} (enter) with key {best[1]}"), True
+        goal_cells = opening if opening else (box - avatar)
         target = GridObject(color=int(grid[y0, x0]), size=len(box), bbox=box_bounds,
                             centroid=((y0 + y1) / 2, (x0 + x1) / 2), anchor=(y0, x0),
-                            cells=tuple(sorted(box - avatar)))
+                            cells=tuple(sorted(goal_cells)))
         choice = self._go(observation, target, purpose=purpose)
         return choice, False
 
@@ -608,11 +645,16 @@ class RulePolicy:
             return None
         avatar = self.explorer.avatar.avatar_cells(grid) if self.explorer.avatar else frozenset()
         ay, ax = min(avatar) if avatar else (0, 0)
-        cands = [o for o in self._objects(grid, avatar) if _sig(o) in kinds]
+        cands = [o for o in self._objects(grid, avatar)
+                 if _sig(o) in kinds and self.collect_presses.get(_sig(o), 0) < COLLECT_TRIES]
         cands.sort(key=lambda o: abs(o.anchor[0] - ay) + abs(o.anchor[1] - ax))
         for cand in cands:
             choice = self._go(observation, cand, purpose="collect")
             if choice is not None:
+                if choice.reason.startswith("rules: touch collect"):
+                    # a class whose touches stop taking anything is not consumable after all
+                    # (wa30: the agent pressed into its own body, which moved with it, 800 times)
+                    self.collect_presses[_sig(cand)] = self.collect_presses.get(_sig(cand), 0) + 1
                 return choice
         return None
 
@@ -659,6 +701,10 @@ class RulePolicy:
         avatar = self.explorer.avatar.avatar_cells(grid) if self.explorer.avatar else frozenset()
         if not avatar:
             return None
+        prior = self.explorer.prior
+        moves = [a for a in observation.available_actions if a in MOVE_KEYS]
+        if prior is not None and any(prior.stats.get((k,)) is None for k in moves):
+            return None   # a key never pressed may be the way to a probe: let the explorer try it first
         # keep entering the current target while it makes sense
         if self.reach_target is not None:
             sig, box = self.reach_target
@@ -668,23 +714,32 @@ class RulePolicy:
             if exhausted:
                 self.reach_tried.add(sig)
                 self._reset_reach()
-        if self.reach_target is None:
-            cands = self._reach_candidates(grid)
-            if known is not None:
-                cands.sort(key=lambda o: 0 if _sig(o) == known else 1)
-            cands = [o for o in cands if _sig(o) not in self.reach_tried]
-            if not cands:
-                return None
-            self.reach_target = (_sig(cands[0]), cands[0].bbox)
-        sig, box = self.reach_target
-        choice, pressed = self._enter_box(observation, box, purpose="reach")
-        if choice is None:
-            self.reach_tried.add(sig)
-            self._reset_reach()
-            return None
-        if pressed:
-            self.reach_presses += 1
-        return choice
+        if self.reach_target is not None:
+            sig, box = self.reach_target
+            choice, pressed = self._enter_box(observation, box, purpose="reach")
+            if choice is not None:
+                if pressed:
+                    self.reach_presses += 1
+                return choice
+            self._reset_reach()   # no way in from here right now: not a verdict on the place
+        cands = self._reach_candidates(grid)
+        if known is not None:
+            cands.sort(key=lambda o: 0 if _sig(o) == known else 1)
+        for cand in cands:
+            if _sig(cand) in self.reach_tried:
+                continue
+            choice, pressed = self._enter_box(observation, cand.bbox, purpose="reach")
+            if choice is None:
+                if not self.config.reach_skip_unreachable:
+                    self.reach_tried.add(_sig(cand))
+                    self._reset_reach()
+                    return None
+                continue          # unreachable with what is known so far (a key, a path); try the next
+            self.reach_target = (_sig(cand), cand.bbox)
+            if pressed:
+                self.reach_presses += 1
+            return choice
+        return None
 
     # -- energy ------------------------------------------------------------------------------
 
@@ -787,6 +842,16 @@ class RulePolicy:
 
     # -- movement helpers --------------------------------------------------------------------
 
+    def _unknown_terrain_left(self, grid: np.ndarray) -> bool:
+        """Can the avatar still walk to a place where some key's outcome is unknown?"""
+        ex = self.explorer
+        avatar = ex.avatar.avatar_cells(grid) if ex.avatar else frozenset()
+        vectors = ex._known_vectors()
+        if not avatar or not vectors:
+            return False
+        return plan_moves(grid, avatar, vectors, ex.passability, goal=None,
+                          forbidden=ex.lethal_moves, transports=ex.transports) is not None
+
     def _avatar_ready(self, grid: np.ndarray) -> bool:
         ex = self.explorer
         return (ex.avatar is not None and ex.avatar.confident and ex.planning_enabled
@@ -885,11 +950,16 @@ class RulePolicy:
         for o in objects:
             counts[_sig(o)] = counts.get(_sig(o), 0) + 1
         avatar_sig = ex.avatar.signature if ex.avatar else None
+        # every signature that moves with the keys is a part of the avatar (wa30: the body and
+        # its facing strip are two colours), never a tool or a place
+        parts = set(ex.avatar.controllable) if (ex.avatar and self.config.avatar_parts) else set()
         bar_colour = ex.energy.full_colour if ex.energy is not None else None
         out = []
         for o in objects:
             s = _sig(o)
             if o.size > SMALL or counts[s] > RARE or s == avatar_sig or set(o.cells) & avatar:
+                continue
+            if (s[0], s[2]) in parts:
                 continue
             if ex.passability.lethal(int(o.color)):
                 continue

@@ -52,7 +52,10 @@ class GraphExplorer:
                  max_mismatches: int = 3, use_effects: bool = True,
                  dial_cap: bool = True, breadth_first: bool = True, click_mask: bool = True,
                  click_split: bool = True, verify_first: bool = True, verify_predictions: bool = True,
-                 diverse_clicks: bool = True) -> None:
+                 diverse_clicks: bool = True, restart_by_frame: bool = True,
+                 blame_silent_restart: bool = True) -> None:
+        self.restart_by_frame = restart_by_frame
+        self.blame_silent_restart = blame_silent_restart
         self.dial_cap = dial_cap
         self.breadth_first = breadth_first
         self.click_mask = click_mask
@@ -402,6 +405,22 @@ class GraphExplorer:
         if self.level_start is None or grid.shape != self.level_start.shape or self.attempt_actions < 1:
             return False
         diff = grid != self.level_start
+        if (self.restart_by_frame and self.mask is not None and self.mask.shape == grid.shape
+                and self.attempt_actions >= 2 and self.pending is not None and self.pending[1][0] != 0
+                and self.last_grid is not None and self.avatar is not None and self.avatar.confident
+                and self.avatar.last_cells and not (diff & ~self.mask).any()):
+            # everything but the bar is the level's first frame again and the avatar, which was
+            # away, is back on its start cells without having walked there: a restart (g50t's
+            # key 5). Games without an avatar are excluded: lp85's toggles recreate the first
+            # frame legitimately and lost 50 actions to this rule.
+            home = self.avatar.avatar_cells(self.level_start)
+            prev = frozenset(self.avatar.last_cells)
+            key = self.pending[1][0]
+            vec = self.avatar.vector(key) if key in MOVE_KEYS else None
+            if home and prev != home:
+                stepped = frozenset((y + vec[0], x + vec[1]) for (y, x) in prev) if vec is not None else None
+                if stepped != home:
+                    return True
         if int(diff.sum()) > self.RESTART_TOLERANCE:
             return False
         if observation.flash:
@@ -420,8 +439,19 @@ class GraphExplorer:
         """Bookkeeping of a death that left no GAME_OVER: the attempt ends, nothing is blamed."""
         self.diagnostics["silent_deaths"] += 1
         died_at = self.attempt_actions + 1
-        if self.budget_aware and self._bar_drained():
+        drained = self.budget_aware and self._bar_drained()
+        if drained:
             self.diagnostics["budget_deaths"] += 1
+        elif (self.blame_silent_restart and self.pending is not None and self.energy is not None and self.energy.capacity
+              and self.last_grid is not None and self.mask_ok(self.last_grid)
+              and self.energy.remaining(self.last_grid) > 2 * max(1.0, self.energy.rate)):
+            # a restart with energy clearly left is this action's doing: never again from that
+            # state (g50t: key 5 restarts the level; the agent walked nine steps into it 3 times)
+            src, action = self.pending
+            self.graph.record(src, action, None, changed=False, game_over=True, level_up=False)
+            self._record_effect(src, action, changed=False, game_over=True)
+            if action[0] in MOVE_KEYS and self.avatar is not None and self.avatar.confident and self.avatar.last_cells:
+                self.lethal_moves.add((frozenset(self.avatar.last_cells), int(action[0])))
         self.death_lengths[died_at] += 1
         self._close_attempt()
         self._learn_budget()

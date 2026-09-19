@@ -56,3 +56,23 @@ def test_explorer_learns_a_conveyor_and_the_policy_rides_it():
     assert ex.diagnostics.get("transports"), "the ride was not learned as a transport"
     assert game.levels_completed == 1
     assert ex.diagnostics["planner_resets"] == 0
+
+
+def test_collect_gives_up_on_a_dot_that_never_vanishes():
+    """One real dot makes colour 9 a consumable; two sticky dots share the signature and never
+    go. The policy must stop pressing into them and still win through the doorway."""
+    game = ReachToy(collect=1, sticky=2, decoys=False)
+    brain, log = run(game, steps=250)
+    assert game.levels_completed == 1
+    presses = [c for _, c in log if c.reason.startswith("rules: touch collect")]
+    assert len(presses) <= 8
+
+
+def test_a_frame_is_entered_through_its_opening():
+    """g50t: the socket opens on one side. Pressing into a closed side is not an attempt; the
+    avatar walks round to the opening and enters there."""
+    game = ReachToy(decoys=False, door="top")
+    brain, _ = run(game, steps=200)
+    assert game.levels_completed == 1
+    assert game.steps <= 45
+    assert not any(sig[0] == 6 for sig in brain.policy.reach_tried)   # the frame was never given up on

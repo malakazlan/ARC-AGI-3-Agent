@@ -8,6 +8,10 @@ accepts the avatar once every dot is gone (before that, the centre is just floor
 must verify candidates instead of guessing.
 `conveyor=(entry, exit)`: stepping onto the colour-8 entry cell lands the avatar on the exit
 cell in the same step (ls20's white strips carry the avatar 20 cells for one press).
+`sticky=n`: n colour-9 dots that block and never vanish (wa30: the agent took its own body
+for a consumable and pressed into it forever).
+`door="top"`: the frame's opening faces away from the start (g50t's socket must be entered
+from its open side).
 """
 from __future__ import annotations
 
@@ -19,12 +23,16 @@ MOVES = {1: (-1, 0), 2: (1, 0), 3: (0, -1), 4: (0, 1)}
 TARGET_BOX = (1, 8, 3, 10)      # frame rows 1-3, cols 8-10; centre (2, 9)
 START = (9, 2)
 DOTS = ((9, 8), (3, 3), (6, 6))
+STICKY = ((2, 2), (10, 11))
 
 
 class ReachToy:
     def __init__(self, collect: int = 0, decoys: bool = True, levels: int = 1,
-                 conveyor: tuple[tuple[int, int], tuple[int, int]] | None = None) -> None:
+                 conveyor: tuple[tuple[int, int], tuple[int, int]] | None = None,
+                 sticky: int = 0, door: str = "bottom") -> None:
         self.collect = collect
+        self.sticky = sticky              # colour-9 dots that never vanish and block like walls
+        self.door = door                  # "bottom": doorway at (3, 9); "top": at (1, 9)
         self.decoys = decoys
         self.levels = levels
         # (entry cell, exit cell): stepping on the entry lands on the exit
@@ -43,7 +51,10 @@ class ReachToy:
         y0, x0, y1, x1 = TARGET_BOX
         g[y0:y1 + 1, x0:x1 + 1] = 6
         g[2, 9] = 0
-        g[3, 9] = 0                                   # the frame is open at the bottom: a doorway
+        if self.door == "top":
+            g[1, 9] = 0                               # open at the top: the avatar must go around
+        else:
+            g[3, 9] = 0                               # the frame is open at the bottom: a doorway
         if self.decoys:
             g[7, 10] = 4
             g[10, 5] = 7
@@ -51,6 +62,9 @@ class ReachToy:
             g[self.conveyor[0]] = 8         # a colour-8 strip: the conveyor's entry
         self.dots_left = set(DOTS[:self.collect])
         for (y, x) in self.dots_left:
+            g[y, x] = 9
+        self.sticky_cells = set(STICKY[:self.sticky])
+        for (y, x) in self.sticky_cells:
             g[y, x] = 9
         g[START] = 1
         return g
@@ -80,6 +94,8 @@ class ReachToy:
                 if self.state == "NOT_FINISHED":
                     self.grid = self._layout()
                 return self.observe()
+        elif (ny, nx) in self.sticky_cells:
+            return self.observe()                       # a sticky dot blocks and never vanishes
         elif cell == 9:
             self.dots_left.discard((ny, nx))
         elif self.conveyor is not None and (ny, nx) == self.conveyor[0]:

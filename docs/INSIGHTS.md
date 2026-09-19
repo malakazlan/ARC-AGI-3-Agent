@@ -216,3 +216,19 @@ Implementation details belong in DECISIONS.md, not here. Mark unverified beliefs
   a time. Also: an instrumented probe that calls policy methods (walks, routes) is not a
   read-only observer; the committed code "lost" level 2 under the instrumented probe and won
   it under a clean one.
+- 2026-09-19 (Track A step 1, reach and collect on g50t and wa30) - Three execution defects
+  that no goal template can compensate for: a place with no path yet was dismissed for the
+  whole level (g50t's socket, at step 11, before the up key was known); a frame open on one
+  side was pushed from its closed sides; a "consumable" that moves with the avatar (wa30's
+  own body, seen by a model that took the facing strip for the avatar) was pressed 800
+  times. Fixes: skip, do not dismiss; enter through the opening; give up on a class after
+  three touches that took nothing. And a restart rule that fires on "frame equals the level
+  start" is wrong for click games: su15 reverts illegal pulls to the first frame and lp85
+  toggles back; the rule now needs a confident avatar that arrived home without walking.
+- 2026-09-19 (method) - Games whose level 1 is won by luck (sc25 100-870 actions, m0r0 720,
+  g50t 300-840) cannot arbitrate a change with 3 or even 5 seeds: sc25 went 5/5, 3/5, 4/5
+  across three configurations that differ in nothing sc25 exercises. Decide such changes on
+  the games they target plus the deterministic ones (ls20, lp85, su15, tu93), and log the
+  lucky games as noise rather than tuning to them. A gate that lets the explorer learn the
+  terrain before reach commits is right for ls20 and wrong when reach is the goal; a per-level
+  budget of 20 explorer actions keeps both.

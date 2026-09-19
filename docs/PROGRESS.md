@@ -193,3 +193,17 @@ Dev machine: i5-7300HQ, 4 cores, 7.7 GB RAM in WSL. Benchmarks with many seeds w
 - Next: the second-conveyor discovery as an "infeasible route -> explore the nearest unknown
   terrain" rule measured one change at a time on the clean runner; then the click-context
   signature for su15 (gravity clicks) and the T1 template for click dials (ft09 legends).
+
+## 2026-09-19 - Track A step 1 and the Track B scaffold
+
+- Two tracks agreed with the owner: A = rule engine (click-select, count-to-zero and
+  make-uniform, discovery budget), B = a local vision model as goal namer, decided by one
+  offline number (goal named within 10 actions, per dev game).
+- Track A step 1 from the wa30/g50t autopsies (reach and collect execution defects, restart
+  recognition). Dev, 3 seeds: **16 median levels, RHAE 1.68** (`2026-09-19-trackA2-dev`;
+  17 / 1.37 before). Kaggle v2 (the 17-level build) was submitted; v1 scored 0.30 public.
+- Track B scaffold committed: `arc3/reasoner/` (summary, prompt, PNG renderer, vLLM client,
+  mock), `eval/reasoner_eval.py` with `eval/goal_truth.json`, `make reasoner-dry`,
+  `docs/TRACK_B_RUNBOOK.md` for the pod session. Nothing run against a real model yet.
+- Next: pod run for Track B (owner); Track A step 2 (count-to-zero and make-uniform
+  templates; click-select has no evidence in our traces and moves down).

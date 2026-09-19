@@ -139,6 +139,8 @@ class Orchestrator:
                 verify_first=config.verify_first,
                 verify_predictions=config.verify_predictions,
                 diverse_clicks=config.diverse_clicks,
+                restart_by_frame=config.restart_by_frame,
+                blame_silent_restart=config.blame_silent_restart,
             )
         return self._random_policy
 
